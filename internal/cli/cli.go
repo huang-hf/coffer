@@ -1,0 +1,145 @@
+package cli
+
+import (
+	"encoding/json"
+	"fmt"
+	"io"
+	"strings"
+)
+
+type Options struct {
+	NS        string
+	JSON      bool
+	Inject    string
+	Config    string
+}
+
+// Run is the main entry point for the CLI
+func Run(args []string, stdout io.Writer, stderr io.Writer) int {
+	opts, err := parseGlobalFlags(&args)
+	if err != nil {
+		fmt.Fprintf(stderr, "Error: %v\n", err)
+		return 1
+	}
+
+	if len(args) == 0 {
+		printUsage(stderr)
+		return 1
+	}
+
+	switch args[0] {
+	case "init":
+		return runInit(args[1:], stdout, stderr, opts)
+	case "secret":
+		return runSecret(args[1:], stdout, stderr, opts)
+	case "run":
+		return runRun(args[1:], stdout, stderr, opts)
+	case "check":
+		return runCheck(args[1:], stdout, stderr, opts)
+	case "status":
+		return runStatus(args[1:], stdout, stderr, opts)
+	case "migrate":
+		return runMigrate(args[1:], stdout, stderr, opts)
+	case "--help", "-h":
+		printUsage(stdout)
+		return 0
+	case "--version", "-v":
+		fmt.Fprintln(stdout, "coffer v0.1.0")
+		return 0
+	default:
+		fmt.Fprintf(stderr, "Unknown command: %s\n\n", args[0])
+		printUsage(stderr)
+		return 1
+	}
+}
+
+func parseGlobalFlags(args *[]string) (*Options, error) {
+	opts := &Options{
+		NS:     "default",
+		Inject: "env",
+	}
+
+	var remaining []string
+	for i := 0; i < len(*args); i++ {
+		arg := (*args)[i]
+		switch {
+		case strings.HasPrefix(arg, "--ns="):
+			opts.NS = strings.TrimPrefix(arg, "--ns=")
+		case arg == "--ns" && i+1 < len(*args):
+			i++
+			opts.NS = (*args)[i]
+		case arg == "--json":
+			opts.JSON = true
+		case strings.HasPrefix(arg, "--inject="):
+			opts.Inject = strings.TrimPrefix(arg, "--inject=")
+		case arg == "--inject" && i+1 < len(*args):
+			i++
+			opts.Inject = (*args)[i]
+		case strings.HasPrefix(arg, "--config="):
+			opts.Config = strings.TrimPrefix(arg, "--config=")
+		case arg == "--config" && i+1 < len(*args):
+			i++
+			opts.Config = (*args)[i]
+		default:
+			remaining = append(remaining, arg)
+		}
+	}
+
+	*args = remaining
+	return opts, nil
+}
+
+func printUsage(w io.Writer) {
+	fmt.Fprintln(w, "Usage: coffer <command> [options]")
+	fmt.Fprintln(w)
+	fmt.Fprintln(w, "Commands:")
+	fmt.Fprintln(w, "  init                Initialize project")
+	fmt.Fprintln(w, "  secret add <name>   Add a secret")
+	fmt.Fprintln(w, "  secret update <name> Update a secret")
+	fmt.Fprintln(w, "  secret list         List secrets")
+	fmt.Fprintln(w, "  secret delete <name> Delete a secret")
+	fmt.Fprintln(w, "  secret get <name>   Get secret value (interactive only)")
+	fmt.Fprintln(w, "  run <command>       Run command with secrets injected")
+	fmt.Fprintln(w, "  check               Check if secrets are ready")
+	fmt.Fprintln(w, "  status              Show current status")
+	fmt.Fprintln(w, "  migrate <env-file>  Migrate .env file to coffer")
+	fmt.Fprintln(w)
+	fmt.Fprintln(w, "Global Options:")
+	fmt.Fprintln(w, "  --ns=<namespace>    Specify namespace (default: 'default')")
+	fmt.Fprintln(w, "  --json              Output JSON (for agent)")
+	fmt.Fprintln(w, "  --inject=<mode>     Injection mode: env or file (default: env)")
+	fmt.Fprintln(w, "  --config=<path>     Config file path")
+	fmt.Fprintln(w, "  -h, --help          Show this help")
+	fmt.Fprintln(w, "  -v, --version       Show version")
+}
+
+func writeJSON(w io.Writer, data interface{}) error {
+	encoder := json.NewEncoder(w)
+	encoder.SetIndent("", "  ")
+	return encoder.Encode(data)
+}
+
+func printJSON(w io.Writer, data interface{}) {
+	writeJSON(w, data)
+}
+
+type ErrorResponse struct {
+	Error   string `json:"error"`
+	Message string `json:"message,omitempty"`
+	Fix     string `json:"fix,omitempty"`
+}
+
+func writeError(w io.Writer, err *ErrorResponse, jsonMode bool) int {
+	if jsonMode {
+		writeJSON(w, err)
+	} else {
+		fmt.Fprintf(w, "Error: %s\n", err.Error)
+		if err.Message != "" {
+			fmt.Fprintf(w, "Message: %s\n", err.Message)
+		}
+		if err.Fix != "" {
+			fmt.Fprintf(w, "Fix: %s\n", err.Fix)
+		}
+	}
+	return 1
+}
