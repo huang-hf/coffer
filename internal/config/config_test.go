@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -192,6 +193,113 @@ func TestSetSecretForNamespace(t *testing.T) {
 	cfg.SetSecretForNamespace("staging", "api-key", "{{coffer:api-key}}")
 	if _, ok := cfg.Namespaces["staging"].Secrets["api-key"]; !ok {
 		t.Error("SetSecretForNamespace() did not set secret in staging namespace")
+	}
+}
+
+func TestMerge(t *testing.T) {
+	base := &Config{
+		DefaultNS: "production",
+		Inject:    "env",
+		Secrets: map[string]string{
+			"db-pwd":  "{{coffer:db-pwd}}",
+			"api-key": "{{coffer:api-key}}",
+		},
+		Namespaces: map[string]*NamespaceConfig{
+			"staging": {
+				Secrets: map[string]string{
+					"db-pwd": "{{coffer:db-pwd}}",
+				},
+			},
+		},
+	}
+	base.Secrets = make(map[string]string) // re-init after struct literal
+	base.Namespaces = make(map[string]*NamespaceConfig)
+	base.Secrets["db-pwd"] = "{{coffer:db-pwd}}"
+	base.Secrets["api-key"] = "{{coffer:api-key}}"
+	base.Namespaces["staging"] = &NamespaceConfig{Secrets: map[string]string{"db-pwd": "{{coffer:db-pwd}}"}}
+
+	override := &Config{
+		Secrets: map[string]string{
+			"api-key":   "{{coffer:api-key-v2}}", // override
+			"new-secret": "{{coffer:new-secret}}", // add
+		},
+		Namespaces: map[string]*NamespaceConfig{
+			"staging": {
+				Secrets: map[string]string{
+					"api-key": "{{coffer:api-key-staging}}",
+				},
+			},
+			"production": {
+				Secrets: map[string]string{
+					"db-pwd": "{{coffer:db-pwd-prod}}",
+				},
+			},
+		},
+	}
+
+	base.Merge(override)
+
+	// Check merged top-level secrets
+	if base.Secrets["db-pwd"] != "{{coffer:db-pwd}}" {
+		t.Errorf("db-pwd should stay, got %v", base.Secrets["db-pwd"])
+	}
+	if base.Secrets["api-key"] != "{{coffer:api-key-v2}}" {
+		t.Errorf("api-key should be overridden, got %v", base.Secrets["api-key"])
+	}
+	if base.Secrets["new-secret"] != "{{coffer:new-secret}}" {
+		t.Errorf("new-secret should be added, got %v", base.Secrets["new-secret"])
+	}
+
+	// Check merged namespace secrets
+	if base.Namespaces["staging"].Secrets["api-key"] != "{{coffer:api-key-staging}}" {
+		t.Errorf("staging/api-key should be overridden, got %v", base.Namespaces["staging"].Secrets["api-key"])
+	}
+	if base.Namespaces["staging"].Secrets["db-pwd"] != "{{coffer:db-pwd}}" {
+		t.Errorf("staging/db-pwd should stay from base, got %v", base.Namespaces["staging"].Secrets["db-pwd"])
+	}
+	if base.Namespaces["production"].Secrets["db-pwd"] != "{{coffer:db-pwd-prod}}" {
+		t.Errorf("production/db-pwd should be added from override, got %v", base.Namespaces["production"].Secrets["db-pwd"])
+	}
+}
+
+func TestLoadChain_LocalOnly(t *testing.T) {
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, ".coffer")
+
+	content := `
+default_ns: staging
+inject: file
+secrets:
+  db-pwd: "{{coffer:db-pwd}}"
+`
+	if err := os.WriteFile(configPath, []byte(content), 0644); err != nil {
+		t.Fatalf("Failed to write local config: %v", err)
+	}
+
+	// No global config at all — should work with just local
+	cfg, err := LoadChain(configPath)
+	if err != nil {
+		t.Fatalf("LoadChain() error = %v", err)
+	}
+
+	if cfg.DefaultNS != "staging" {
+		t.Errorf("DefaultNS = %v, want staging", cfg.DefaultNS)
+	}
+	if cfg.Inject != "file" {
+		t.Errorf("Inject = %v, want file", cfg.Inject)
+	}
+	if len(cfg.Secrets) != 1 {
+		t.Errorf("Secrets length = %v, want 1", len(cfg.Secrets))
+	}
+}
+
+func TestGlobalConfigPath(t *testing.T) {
+	path := GlobalConfigPath()
+	if path == "" {
+		t.Fatal("GlobalConfigPath() returned empty")
+	}
+	if !strings.HasSuffix(path, ".config/coffer/config.yaml") {
+		t.Errorf("GlobalConfigPath() = %v, should end with .config/coffer/config.yaml", path)
 	}
 }
 

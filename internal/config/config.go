@@ -2,12 +2,16 @@ package config
 
 import (
 	"os"
+	"path/filepath"
 
 	"gopkg.in/yaml.v3"
 )
 
 const (
-	EnvNamespace = "COFFER_NS"
+	EnvNamespace     = "COFFER_NS"
+	EnvConfig        = "COFFER_CONFIG"
+	globalConfigDir  = ".config/coffer"
+	globalConfigFile = "config.yaml"
 )
 
 type Config struct {
@@ -51,6 +55,68 @@ func Save(cfg *Config, path string) error {
 	}
 
 	return os.WriteFile(path, data, 0644)
+}
+
+// GlobalConfigPath returns path to global config (~/.config/coffer/config.yaml)
+func GlobalConfigPath() string {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return ""
+	}
+	return filepath.Join(home, globalConfigDir, globalConfigFile)
+}
+
+// LoadChain loads local config and falls back to global for secrets.
+// If both exist: global secrets as base, local overrides/adds.
+// Settings (default_ns, inject, config) come from local only.
+func LoadChain(localPath string) (*Config, error) {
+	// Try local first
+	localCfg, localErr := Load(localPath)
+	if localErr == nil {
+		// Local exists — merge global secrets underneath
+		globalCfg, gErr := Load(GlobalConfigPath())
+		if gErr == nil {
+			merged := &Config{
+				DefaultNS:  localCfg.DefaultNS,
+				Inject:     localCfg.Inject,
+				Config:     localCfg.Config,
+				Secrets:    make(map[string]string),
+				Namespaces: make(map[string]*NamespaceConfig),
+			}
+			merged.Merge(globalCfg) // global secrets as base
+			merged.Merge(localCfg)  // local overrides/adds
+			return merged, nil
+		}
+		// No global config — just return local
+		return localCfg, nil
+	}
+
+	// No local — try global
+	globalCfg, gErr := Load(GlobalConfigPath())
+	if gErr == nil {
+		return globalCfg, nil
+	}
+
+	// Neither exists — return the original error
+	return nil, localErr
+}
+
+// Merge merges another config's secrets into this one.
+// other's secrets override/add to this config's secrets.
+func (c *Config) Merge(other *Config) {
+	for k, v := range other.Secrets {
+		c.Secrets[k] = v
+	}
+	for ns, nsConfig := range other.Namespaces {
+		if _, ok := c.Namespaces[ns]; !ok {
+			c.Namespaces[ns] = &NamespaceConfig{
+				Secrets: make(map[string]string),
+			}
+		}
+		for k, v := range nsConfig.Secrets {
+			c.Namespaces[ns].Secrets[k] = v
+		}
+	}
 }
 
 func (c *Config) ResolveNamespace(cliNS string) string {
