@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 
@@ -12,19 +13,59 @@ const (
 	EnvConfig        = "COFFER_CONFIG"
 	globalConfigDir  = ".config/coffer"
 	globalConfigFile = "config.yaml"
+
+	// DBAuthSecretNS is the keychain namespace used for database passwords.
+	DBAuthSecretNS = "_db"
 )
 
+// DBSecretName returns the keychain account name for a database capability's password.
+func DBSecretName(dbName string) string {
+	return "db:" + dbName
+}
+
+func (d *DatabaseConfig) Validate() error {
+	switch {
+	case d.Type == "":
+		return fmt.Errorf("database type is required")
+	case d.Type != DBTypePostgres:
+		return fmt.Errorf("unsupported database type %q (only %q is supported)", d.Type, DBTypePostgres)
+	case d.Host == "":
+		return fmt.Errorf("database host is required")
+	case d.Port <= 0 || d.Port > 65535:
+		return fmt.Errorf("database port must be between 1 and 65535")
+	case d.User == "":
+		return fmt.Errorf("database user is required")
+	case d.Database == "":
+		return fmt.Errorf("database name is required")
+	default:
+		return nil
+	}
+}
+
 type Config struct {
-	DefaultNS string            `yaml:"default_ns"`
-	Inject    string            `yaml:"inject"`
-	Config    string            `yaml:"config"`
-	Secrets   map[string]string `yaml:"secrets"`
-	Namespaces map[string]*NamespaceConfig `yaml:"namespaces,omitempty"`
+	DefaultNS  string                       `yaml:"default_ns"`
+	Inject     string                       `yaml:"inject"`
+	Config     string                       `yaml:"config"`
+	Secrets    map[string]string            `yaml:"secrets"`
+	Namespaces map[string]*NamespaceConfig  `yaml:"namespaces,omitempty"`
+	Databases  map[string]*DatabaseConfig   `yaml:"databases,omitempty"`
 }
 
 type NamespaceConfig struct {
 	Secrets map[string]string `yaml:"secrets"`
 }
+
+type DatabaseConfig struct {
+	Type     string `yaml:"type"`
+	Host     string `yaml:"host"`
+	Port     int    `yaml:"port"`
+	User     string `yaml:"user"`
+	Database string `yaml:"database"`
+}
+
+const (
+	DBTypePostgres = "postgres"
+)
 
 func Load(path string) (*Config, error) {
 	data, err := os.ReadFile(path)
@@ -43,6 +84,10 @@ func Load(path string) (*Config, error) {
 
 	if cfg.Namespaces == nil {
 		cfg.Namespaces = make(map[string]*NamespaceConfig)
+	}
+
+	if cfg.Databases == nil {
+		cfg.Databases = make(map[string]*DatabaseConfig)
 	}
 
 	return cfg, nil
@@ -101,8 +146,8 @@ func LoadChain(localPath string) (*Config, error) {
 	return nil, localErr
 }
 
-// Merge merges another config's secrets into this one.
-// other's secrets override/add to this config's secrets.
+// Merge merges another config's secrets, namespaces, and databases into this one.
+// other's values override/add to this config's values.
 func (c *Config) Merge(other *Config) {
 	for k, v := range other.Secrets {
 		c.Secrets[k] = v
@@ -116,6 +161,9 @@ func (c *Config) Merge(other *Config) {
 		for k, v := range nsConfig.Secrets {
 			c.Namespaces[ns].Secrets[k] = v
 		}
+	}
+	for name, db := range other.Databases {
+		c.Databases[name] = db
 	}
 }
 

@@ -265,6 +265,7 @@ func TestMerge(t *testing.T) {
 func TestLoadChain_LocalOnly(t *testing.T) {
 	dir := t.TempDir()
 	configPath := filepath.Join(dir, ".coffer")
+	t.Setenv("HOME", dir)
 
 	content := `
 default_ns: staging

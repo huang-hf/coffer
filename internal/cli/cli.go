@@ -33,6 +33,8 @@ func Run(args []string, stdout io.Writer, stderr io.Writer) int {
 		return runInit(args[1:], stdout, stderr, opts)
 	case "secret":
 		return runSecret(args[1:], stdout, stderr, opts)
+	case "db":
+		return runDB(args[1:], stdout, stderr, opts)
 	case "run":
 		return runRun(args[1:], stdout, stderr, opts)
 	case "check":
@@ -109,6 +111,10 @@ func printUsage(w io.Writer) {
 	fmt.Fprintln(w, "  secret list         List secrets")
 	fmt.Fprintln(w, "  secret delete <name> Delete a secret")
 	fmt.Fprintln(w, "  secret get <name>   Get secret value (interactive only)")
+	fmt.Fprintln(w, "  db add <name>       Add a database connection")
+	fmt.Fprintln(w, "  db list             List database connections")
+	fmt.Fprintln(w, "  db remove <name>    Remove a database connection")
+	fmt.Fprintln(w, "  db proxy <name>     Start database proxy")
 	fmt.Fprintln(w, "  run <command>       Run command with secrets injected")
 	fmt.Fprintln(w, "  check               Check if secrets are ready")
 	fmt.Fprintln(w, "  status              Show current status")
@@ -119,6 +125,7 @@ func printUsage(w io.Writer) {
 	fmt.Fprintln(w, "  --json              Output JSON (for agent)")
 	fmt.Fprintln(w, "  --inject=<mode>     Injection mode: env or file (default: env)")
 	fmt.Fprintln(w, "  --config=<path>     Config file path")
+	fmt.Fprintln(w, "  --global            Use global config instead of local .coffer")
 	fmt.Fprintln(w, "  -h, --help          Show this help")
 	fmt.Fprintln(w, "  -v, --version       Show version")
 }
