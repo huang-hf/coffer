@@ -18,7 +18,7 @@ func runRun(args []string, stdout io.Writer, stderr io.Writer, opts *Options) in
 		return 1
 	}
 
-	cfg, err := config.Load(".coffer")
+	cfg, err := config.LoadChain(".coffer")
 	if err != nil {
 		fmt.Fprintf(stderr, "Error: not initialized. Run 'coffer init' first\n")
 		return 1

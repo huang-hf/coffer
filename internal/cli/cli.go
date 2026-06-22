@@ -12,6 +12,7 @@ type Options struct {
 	JSON      bool
 	Inject    string
 	Config    string
+	Global    bool
 }
 
 // Run is the main entry point for the CLI
@@ -62,6 +63,13 @@ func parseGlobalFlags(args *[]string) (*Options, error) {
 	var remaining []string
 	for i := 0; i < len(*args); i++ {
 		arg := (*args)[i]
+
+		// -- terminates option parsing; everything after is positional
+		if arg == "--" {
+			remaining = append(remaining, (*args)[i+1:]...)
+			break
+		}
+
 		switch {
 		case strings.HasPrefix(arg, "--ns="):
 			opts.NS = strings.TrimPrefix(arg, "--ns=")
@@ -80,6 +88,8 @@ func parseGlobalFlags(args *[]string) (*Options, error) {
 		case arg == "--config" && i+1 < len(*args):
 			i++
 			opts.Config = (*args)[i]
+		case arg == "--global":
+			opts.Global = true
 		default:
 			remaining = append(remaining, arg)
 		}

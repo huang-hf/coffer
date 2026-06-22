@@ -36,9 +36,17 @@ func runSecret(args []string, stdout io.Writer, stderr io.Writer, opts *Options)
 	}
 }
 
+// configPath returns the config file path based on global flag
+func configPath(opts *Options) string {
+	if opts.Global {
+		return config.GlobalConfigPath()
+	}
+	return ".coffer"
+}
+
 func runSecretAdd(args []string, stdout io.Writer, stderr io.Writer, opts *Options) int {
 	if len(args) != 1 {
-		fmt.Fprintln(stderr, "Usage: coffer secret add <name> --ns=<namespace>")
+		fmt.Fprintln(stderr, "Usage: coffer secret add <name> [--ns=<namespace>] [--global]")
 		return 1
 	}
 
@@ -49,9 +57,15 @@ func runSecretAdd(args []string, stdout io.Writer, stderr io.Writer, opts *Optio
 		return 1
 	}
 
-	cfg, err := config.Load(".coffer")
+	cfgPath := configPath(opts)
+
+	cfg, err := config.Load(cfgPath)
 	if err != nil {
-		fmt.Fprintf(stderr, "Error: not initialized. Run 'coffer init' first\n")
+		if opts.Global {
+			fmt.Fprintln(stderr, "Error: global config not found. Run 'coffer init --global' first")
+		} else {
+			fmt.Fprintln(stderr, "Error: not initialized. Run 'coffer init' first")
+		}
 		return 1
 	}
 
@@ -81,17 +95,21 @@ func runSecretAdd(args []string, stdout io.Writer, stderr io.Writer, opts *Optio
 	}
 
 	cfg.SetSecretForNamespace(ns, name, "")
-	if err := config.Save(cfg, ".coffer"); err != nil {
+	if err := config.Save(cfg, cfgPath); err != nil {
 		fmt.Fprintf(stderr, "Warning: secret saved to keychain but failed to update config: %v\n", err)
 	}
 
-	fmt.Fprintf(stdout, "✓ Secret '%s' saved to namespace '%s'\n", name, ns)
+	scope := "local"
+	if opts.Global {
+		scope = "global"
+	}
+	fmt.Fprintf(stdout, "✓ Secret '%s' saved to %s namespace '%s'\n", name, scope, ns)
 	return 0
 }
 
 func runSecretUpdate(args []string, stdout io.Writer, stderr io.Writer, opts *Options) int {
 	if len(args) != 1 {
-		fmt.Fprintln(stderr, "Usage: coffer secret update <name> --ns=<namespace>")
+		fmt.Fprintln(stderr, "Usage: coffer secret update <name> [--ns=<namespace>] [--global]")
 		return 1
 	}
 
@@ -102,24 +120,31 @@ func runSecretUpdate(args []string, stdout io.Writer, stderr io.Writer, opts *Op
 		return 1
 	}
 
-	cfg, err := config.Load(".coffer")
+	cfgPath := configPath(opts)
+
+	cfg, err := config.Load(cfgPath)
 	if err != nil {
-		fmt.Fprintf(stderr, "Error: not initialized. Run 'coffer init' first\n")
+		if opts.Global {
+			fmt.Fprintln(stderr, "Error: global config not found. Run 'coffer init --global' first")
+		} else {
+			fmt.Fprintln(stderr, "Error: not initialized. Run 'coffer init' first")
+		}
 		return 1
 	}
 
 	ns := cfg.ResolveNamespace(opts.NS)
 
-	store, err := secret.NewStore()
-	if err != nil {
-		fmt.Fprintf(stderr, "Error creating secret store: %v\n", err)
-		return 1
-	}
-
+	// Check secret exists in config (avoid keychain SIGKILL on macOS)
 	nsSecrets := cfg.GetSecretsForNamespace(ns)
 	if _, found := nsSecrets[name]; !found {
 		fmt.Fprintf(stderr, "Error: secret '%s' not found in namespace '%s'\n", name, ns)
 		fmt.Fprintln(stderr, "Use 'coffer secret add' to create a new secret")
+		return 1
+	}
+
+	store, err := secret.NewStore()
+	if err != nil {
+		fmt.Fprintf(stderr, "Error creating secret store: %v\n", err)
 		return 1
 	}
 
@@ -140,23 +165,40 @@ func runSecretUpdate(args []string, stdout io.Writer, stderr io.Writer, opts *Op
 		return 1
 	}
 
-	fmt.Fprintf(stdout, "✓ Secret '%s' updated in namespace '%s'\n", name, ns)
+	scope := "local"
+	if opts.Global {
+		scope = "global"
+	}
+	fmt.Fprintf(stdout, "✓ Secret '%s' updated in %s namespace '%s'\n", name, scope, ns)
 	return 0
 }
 
 func runSecretList(args []string, stdout io.Writer, stderr io.Writer, opts *Options) int {
 	if len(args) > 0 {
-		fmt.Fprintln(stderr, "Usage: coffer secret list [--ns=<namespace>]")
+		fmt.Fprintln(stderr, "Usage: coffer secret list [--ns=<namespace>] [--global]")
 		return 1
 	}
 
-	cfg, err := config.Load(".coffer")
-	if err != nil {
-		fmt.Fprintf(stderr, "Error: not initialized. Run 'coffer init' first\n")
-		return 1
-	}
+	var cfg *config.Config
+	var err error
+	var ns string
 
-	ns := cfg.ResolveNamespace(opts.NS)
+	if opts.Global {
+		cfg, err = config.Load(config.GlobalConfigPath())
+		if err != nil {
+			fmt.Fprintln(stderr, "Error: global config not found. Run 'coffer init --global' first")
+			return 1
+		}
+		ns = cfg.ResolveNamespace(opts.NS)
+	} else {
+		cfg, err = config.LoadChain(".coffer")
+		if err != nil {
+			fmt.Fprintln(stderr, "Error: not initialized. Run 'coffer init' first")
+			return 1
+		}
+		// For listing, ResolveNamespace works on any config
+		ns = cfg.ResolveNamespace(opts.NS)
+	}
 
 	store, err := secret.NewStore()
 	if err != nil {
@@ -184,7 +226,11 @@ func runSecretList(args []string, stdout io.Writer, stderr io.Writer, opts *Opti
 		return 0
 	}
 
-	fmt.Fprintf(stdout, "Secrets in namespace '%s':\n", ns)
+	scope := "merged"
+	if opts.Global {
+		scope = "global"
+	}
+	fmt.Fprintf(stdout, "Secrets in %s namespace '%s':\n", scope, ns)
 	for _, name := range secrets {
 		fmt.Fprintf(stdout, "  - %s\n", name)
 	}
@@ -194,25 +240,25 @@ func runSecretList(args []string, stdout io.Writer, stderr io.Writer, opts *Opti
 
 func runSecretDelete(args []string, stdout io.Writer, stderr io.Writer, opts *Options) int {
 	if len(args) != 1 {
-		fmt.Fprintln(stderr, "Usage: coffer secret delete <name> --ns=<namespace>")
+		fmt.Fprintln(stderr, "Usage: coffer secret delete <name> [--ns=<namespace>] [--global]")
 		return 1
 	}
 
 	name := args[0]
 
-	cfg, err := config.Load(".coffer")
+	cfgPath := configPath(opts)
+
+	cfg, err := config.Load(cfgPath)
 	if err != nil {
-		fmt.Fprintf(stderr, "Error: not initialized. Run 'coffer init' first\n")
+		if opts.Global {
+			fmt.Fprintln(stderr, "Error: global config not found. Run 'coffer init --global' first")
+		} else {
+			fmt.Fprintln(stderr, "Error: not initialized. Run 'coffer init' first")
+		}
 		return 1
 	}
 
 	ns := cfg.ResolveNamespace(opts.NS)
-
-	store, err := secret.NewStore()
-	if err != nil {
-		fmt.Fprintf(stderr, "Error creating secret store: %v\n", err)
-		return 1
-	}
 
 	fmt.Fprintf(stdout, "Delete secret '%s' from namespace '%s'? (y/N): ", name, ns)
 	reader := bufio.NewReader(os.Stdin)
@@ -223,23 +269,33 @@ func runSecretDelete(args []string, stdout io.Writer, stderr io.Writer, opts *Op
 		return 0
 	}
 
+	store, err := secret.NewStore()
+	if err != nil {
+		fmt.Fprintf(stderr, "Error creating secret store: %v\n", err)
+		return 1
+	}
+
 	if err := store.Delete(ns, name); err != nil {
 		fmt.Fprintf(stderr, "Error deleting secret: %v\n", err)
 		return 1
 	}
 
 	cfg.DeleteSecretForNamespace(ns, name)
-	if err := config.Save(cfg, ".coffer"); err != nil {
+	if err := config.Save(cfg, cfgPath); err != nil {
 		fmt.Fprintf(stderr, "Warning: secret deleted from keychain but failed to update config: %v\n", err)
 	}
 
-	fmt.Fprintf(stdout, "✓ Secret '%s' deleted from namespace '%s'\n", name, ns)
+	scope := "local"
+	if opts.Global {
+		scope = "global"
+	}
+	fmt.Fprintf(stdout, "✓ Secret '%s' deleted from %s namespace '%s'\n", name, scope, ns)
 	return 0
 }
 
 func runSecretGet(args []string, stdout io.Writer, stderr io.Writer, opts *Options) int {
 	if len(args) != 1 {
-		fmt.Fprintln(stderr, "Usage: coffer secret get <name> --ns=<namespace>")
+		fmt.Fprintln(stderr, "Usage: coffer secret get <name> [--ns=<namespace>] [--global]")
 		return 1
 	}
 
@@ -251,9 +307,15 @@ func runSecretGet(args []string, stdout io.Writer, stderr io.Writer, opts *Optio
 
 	name := args[0]
 
-	cfg, err := config.Load(".coffer")
+	cfgPath := configPath(opts)
+
+	cfg, err := config.Load(cfgPath)
 	if err != nil {
-		fmt.Fprintf(stderr, "Error: not initialized. Run 'coffer init' first\n")
+		if opts.Global {
+			fmt.Fprintln(stderr, "Error: global config not found. Run 'coffer init --global' first")
+		} else {
+			fmt.Fprintln(stderr, "Error: not initialized. Run 'coffer init' first")
+		}
 		return 1
 	}
 
@@ -281,24 +343,26 @@ func readPassword(stderr io.Writer) (string, error) {
 		if err != nil {
 			return "", err
 		}
-		fmt.Fprintln(stderr, "") // newline after hidden input
-		return strings.TrimSpace(string(value)), nil
+		fmt.Fprintln(stderr)
+		return string(value), nil
 	}
-	// fallback for non-terminal (piped input)
-	var value string
-	_, err := fmt.Scanln(&value)
+
+	// Not a terminal — read from stdin line
+	reader := bufio.NewReader(os.Stdin)
+	value, err := reader.ReadString('\n')
 	if err != nil {
 		return "", err
 	}
-	return strings.TrimSpace(value), nil
+	return strings.TrimRight(value, "\r\n"), nil
 }
 
 func isValidSecretName(name string) bool {
-	if name == "" {
+	if len(name) == 0 {
 		return false
 	}
 	for _, c := range name {
-		if !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '-' || c == '_') {
+		if !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+			(c >= '0' && c <= '9') || c == '-' || c == '_') {
 			return false
 		}
 	}

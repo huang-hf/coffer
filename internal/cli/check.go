@@ -14,7 +14,7 @@ func runCheck(args []string, stdout io.Writer, stderr io.Writer, opts *Options) 
 		return 1
 	}
 
-	cfg, err := config.Load(".coffer")
+	cfg, err := config.LoadChain(".coffer")
 	if err != nil {
 		if opts.JSON {
 			writeJSON(stdout, &ErrorResponse{
@@ -101,7 +101,7 @@ func runStatus(args []string, stdout io.Writer, stderr io.Writer, opts *Options)
 		return 1
 	}
 
-	cfg, err := config.Load(".coffer")
+	cfg, err := config.LoadChain(".coffer")
 	if err != nil {
 		fmt.Fprintln(stderr, "Error: not initialized. Run 'coffer init' first")
 		return 1
@@ -113,7 +113,7 @@ func runStatus(args []string, stdout io.Writer, stderr io.Writer, opts *Options)
 		return 1
 	}
 
-	fmt.Fprintln(stdout, "Safetool Status")
+	fmt.Fprintln(stdout, "Coffer Status")
 	fmt.Fprintln(stdout, "───────────────")
 	fmt.Fprintf(stdout, "Default namespace: %s\n", cfg.DefaultNS)
 	fmt.Fprintf(stdout, "Inject mode: %s\n", cfg.Inject)
