@@ -12,96 +12,64 @@ triggers:
 
 A CLI tool for managing and injecting secrets into commands, designed for AI agent workflows.
 
-## Core Concepts
+## Config Levels
 
-- **Namespaces**: Isolate secrets by environment (staging, production)
-- **Injection Modes**: `env` (environment variables) or `file` (temporary files)
-- **System Keychain**: Secrets stored in OS-native secure storage
-- **Caller Detection**: Environment variable + process tree verification
+Two levels, merged at runtime:
+
+| Level | Path | Command |
+|-------|------|---------|
+| **Global** | `~/.config/coffer/config.yaml` | `coffer init --global` |
+| **Local** | `./.coffer` | `coffer init` |
+
+**Resolution**: local settings (`default_ns`, `inject`, `config`) take full control. Secrets: global as base, local overrides/adds.
 
 ## Commands
 
-### Initialize Project
+### Initialize
 ```bash
-coffer init
+coffer init              # local .coffer
+coffer init --global     # global ~/.config/coffer/config.yaml
 ```
-Creates `.coffer` configuration file.
 
 ### Manage Secrets
 ```bash
-# Add secret (interactive prompt)
-coffer secret add <name> [--ns=<namespace>]
+coffer secret add <name> [--ns=<namespace>] [--global]
+coffer secret update <name> [--ns=<namespace>] [--global]
+coffer secret list [--ns=<namespace>] [--global]
+coffer secret delete <name> [--ns=<namespace>] [--global]
+```
 
-# List secrets
-coffer secret list [--ns=<namespace>]
+### Run
+```bash
+coffer run <command> [args...]           # env mode (default)
+coffer run --inject=file <command>       # file mode
+coffer run --ns=staging python app.py   # namespace
+```
 
-# Delete secret
-coffer secret delete <name> [--ns=<namespace>]
-
-# Check status
+### Check
+```bash
 coffer check [--ns=<namespace>] [--json]
 ```
 
-### Run Commands with Secrets
-```bash
-# Environment variable injection (default)
-coffer run <command> [args...]
+## Namespace System
 
-# File injection mode
-coffer run --inject=file <command> [args...]
+Isolate secrets by environment:
 
-# Specific namespace
-coffer run --ns=staging python app.py
-```
+Priority: CLI `--ns` > env `COFFER_NS` > .coffer `default_ns`
 
-## Configuration File (`.coffer`)
-
-```yaml
-default_ns: production
-inject: env
-secrets:
-  db-pwd: "{{coffer:db-pwd}}"
-  api-key: "{{coffer:api-key}}"
-namespaces:
-  staging:
-    secrets:
-      db-pwd: "{{coffer:db-pwd}}"
-```
-
-## Environment Variables
-
-When running `coffer run`:
-- `COFFER_NS`: Current namespace
-- `COFFER_CALLER`: Set to "1" for caller detection
-- Secret values: Uppercased, underscores for hyphens (e.g., `DB_PWD`)
-
-## JSON Output (for Agents)
+## Agent Usage
 
 ```bash
+# Check status (merged: local + global)
 coffer check --json
+# {"ready": true, "ns": "default", "secrets": [...]}
+
+# Run with secrets
+coffer run python app.py
 ```
-
-Response:
-```json
-{
-  "ready": true,
-  "ns": "production",
-  "secrets": [
-    {"name": "db-pwd", "configured": true},
-    {"name": "api-key", "configured": true}
-  ]
-}
-```
-
-## Security Notes
-
-- `secret get` is blocked in JSON mode (agent mode)
-- Secrets stored in OS Keychain, not filesystem
-- Caller verification via environment + process tree
 
 ## Platform Support
 
 - **macOS**: Keychain via `security` command
 - **Linux**: GNOME Keyring via `secret-tool`
 - **Windows**: Credential Manager via `cmdkey`
-- **Fallback**: File-based storage
