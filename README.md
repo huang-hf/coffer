@@ -6,19 +6,19 @@ Coffer stores secrets in your OS native credential store (macOS Keychain, Linux 
 
 ---
 
-## Installation (关键)
+## Installation
 
-Coffer 是一个 Go 项目，安装就是把编译好的二进制文件放到服务器上。以下是从零开始的完整路径。
+Coffer is a Go project — installation means building the binary and placing it on your target machine.
 
-### 前置条件
+### Prerequisites
 
-| 环境 | 依赖 |
-|------|------|
-| **macOS** | `security`（系统自带，无需额外安装） |
-| **Linux** | `secret-tool`（`libsecret` 包提供）+ 正在运行的 keyring 守护进程 |
-| **Windows** | `cmdkey`（系统自带） |
+| Platform | Dependency | Notes |
+|----------|-----------|-------|
+| **macOS** | `security` | Built-in, nothing to install |
+| **Linux** | `secret-tool` (`libsecret`) + running keyring daemon | See below |
+| **Windows** | `cmdkey` | Built-in |
 
-#### Linux 依赖安装
+#### Linux Dependencies
 
 ```bash
 # Debian / Ubuntu
@@ -28,51 +28,51 @@ sudo apt-get update && sudo apt-get install -y libsecret-tools gnome-keyring
 sudo yum install -y libsecret-tools gnome-keyring
 ```
 
-Linux 服务器通常是 headless（无桌面环境），需要额外配置 D-Bus 和一个 keyring 守护进程才能使用 `secret-tool`：
+Headless Linux servers need a D-Bus session and a keyring daemon for `secret-tool`:
 
 ```bash
-# 安装后,通过 dbus-launch 启动一个 session bus
+# Start a D-Bus session bus
 export $(dbus-launch)
 
-# 解锁 gnome-keyring（需要设置一个密码，随便输入即可）
+# Unlock gnome-keyring (set any password, it won't be used again)
 echo -n 'any-password' | gnome-keyring-daemon --unlock --daemonize --components=secrets
 
-# 验证 secret-tool 可用
+# Verify secret-tool works
 echo 'test' | secret-tool store --label=test service coffer name coffer.test.test
 secret-tool lookup service coffer name coffer.test.test
 secret-tool clear service coffer name coffer.test.test
 ```
 
-> 建议把 `dbus-launch` 和 `gnome-keyring-daemon` 的启动命令加到 `~/.bashrc` 或 `~/.zshrc` 中，确保每次登录时自动可用。
+> Add `dbus-launch` and `gnome-keyring-daemon` to your `~/.bashrc` or `~/.zshrc` so they start automatically on login.
 
-### 方案 A：从开发机交叉编译并部署到服务器（推荐）
+### Option A: Cross-compile from your dev machine and deploy (recommended)
 
-这是最常见的场景——在本地 Mac 上编译出 Linux 二进制，然后 scp 到服务器。
+Build a Linux binary on your macOS machine and copy it to the server:
 
 ```bash
-# 1. 在本地克隆并编译（指定 Linux 架构）
+# 1. Clone and cross-compile
 git clone <repo-url>
 cd coffer
 
 GOOS=linux GOARCH=amd64 go build -o coffer-linux ./cmd/coffer
 
-# 2. 把二进制传到服务器
+# 2. Copy to server
 scp coffer-linux user@your-server:/tmp/coffer
 
-# 3. 在服务器上安装到系统 PATH
+# 3. Install on server
 ssh user@your-server
 sudo mv /tmp/coffer /usr/local/bin/coffer
 sudo chmod +x /usr/local/bin/coffer
 
-# 4. 验证
+# 4. Verify
 coffer --version
 ```
 
-> 如果你的服务器是 ARM 架构（如 AWS Graviton、树莓派），把 `GOARCH=amd64` 改为 `GOARCH=arm64`。
+> For ARM servers (AWS Graviton, Raspberry Pi), use `GOARCH=arm64` instead of `GOARCH=amd64`.
 
-### 方案 B：直接在服务器上用 Go 编译
+### Option B: Build directly on the server
 
-如果服务器上已经安装了 Go（版本 ≥ 1.25）：
+If Go ≥ 1.25 is already installed on the server:
 
 ```bash
 git clone <repo-url>
@@ -81,145 +81,263 @@ go build -o coffer ./cmd/coffer
 sudo mv coffer /usr/local/bin/
 ```
 
-### 方案 C：`go install`
-
-如果你有实际的 git 仓库地址（module 路径），可以用：
+### Option C: `go install`
 
 ```bash
-# 前提：Go 版本 ≥ 1.25
+# Requires Go ≥ 1.25
 go install example.com/coffer/cmd/coffer@latest
 ```
 
-安装后 `coffer` 在 `$GOPATH/bin` 下，确保该目录在 `PATH` 中。
+`coffer` will be placed in `$GOPATH/bin`. Make sure that directory is in your `PATH`.
 
-### 验证安装
+### Verify Installation
 
 ```bash
 coffer --version
 coffer --help
 ```
 
-看到帮助信息即安装成功。
-
 ---
 
-## 快速开始
-
-### 1. 初始化配置
+## Quick Start
 
 ```bash
-# 全局配置（推荐服务器使用）—— 存在 ~/.config/coffer/config.yaml
+# 1. Initialize (global config recommended for servers)
 coffer init --global
 
-# 或项目本地配置 —— 在当前目录生成 .coffer 文件
-coffer init
-```
-
-**建议服务器场景使用 `--global`**，这样不管在哪个目录都能访问同一组密钥。
-
-### 2. 添加密钥
-
-```bash
-# 交互式输入（推荐）
+# 2. Add secrets
 coffer secret add db-password --global --ns=production
-
-# 或通过 stdin 非交互式输入（适合自动化脚本）
 printf '%s' 'my-secret-value' | coffer secret add API_KEY --global --ns=dev
+
+# 3. Check status
+coffer check --global --ns=production --json
+
+# 4. Run a command with secrets injected
+coffer run --global --ns=production python app.py
 ```
 
-密钥名称保持**精确**——coffer 不会帮你转大写或替换字符。环境变量名就是密钥名本身：
+Secret names are used exactly as provided — coffer does not uppercase or transform them:
 
 ```bash
 coffer secret add AWS_ACCESS_KEY_ID --global --ns=aws
 coffer secret add AWS_SECRET_ACCESS_KEY --global --ns=aws
 ```
 
-### 3. 查看密钥状态
+---
+
+## Tutorial
+
+This section walks through a complete scenario: building coffer, installing it, and using it with a Python application.
+
+### Build and Install
 
 ```bash
-coffer check --global --ns=production --json
+# Clone and build
+git clone <repo-url>
+cd coffer
+go build -o coffer ./cmd/coffer
+
+# Install to user directory
+mkdir -p ~/bin
+cp coffer ~/bin/
+chmod +x ~/bin/coffer
+echo 'export PATH="$HOME/bin:$PATH"' >> ~/.zshrc
+source ~/.zshrc
+
+# Verify
+coffer --version
 ```
 
-输出示例：
-```json
-{"ready": true, "ns": "production", "secrets": [
-  {"name": "db-password", "configured": true}
-]}
-```
-
-### 4. 运行命令（注入密钥）
+### Project Setup
 
 ```bash
-# 在 child 进程的环境变量里注入密钥
-coffer run --global --ns=production python app.py
-
-# 或者用模板注入模式
-coffer run --global --ns=production --inject=file python app.py
+cd /path/to/your/project
+coffer init
 ```
 
-### 5. 完整示例
+### Add Secrets
 
 ```bash
-# 从头开始
-coffer init --global
-coffer secret add DB_PASSWORD --global --ns=prod
-coffer secret add API_KEY --global --ns=prod
+coffer secret add db-password
+# Enter: mysecretpassword
 
-# 查看状态
-coffer check --global --ns=prod --json
-
-# 运行应用
-coffer run --global --ns=prod python -c 'import os; print(os.environ.get("DB_PASSWORD"))'
+coffer secret add api-key
+# Enter: myapikey123
 ```
+
+### List Secrets
+
+```bash
+coffer secret list
+```
+
+### Run a Command
+
+```bash
+coffer run python app.py
+```
+
+### Complete Python Example
+
+Suppose you have `app.py`:
+
+```python
+import os
+
+db_password = os.environ.get('DB_PASSWORD')
+api_key = os.environ.get('API_KEY')
+
+print(f"Database password: {db_password}")
+print(f"API key: {api_key}")
+```
+
+Run it with secrets injected:
+
+```bash
+coffer run python app.py
+```
+
+Output:
+```
+Database password: mysecretpassword
+API key: myapikey123
+```
+
+### Using Namespaces
+
+Namespaces isolate secrets per environment:
+
+```bash
+# Dev environment
+coffer secret add db-password --ns=development
+# Enter: devpassword
+
+# Production environment
+coffer secret add db-password --ns=production
+# Enter: prodpassword
+
+coffer run --ns=development python app.py
+# Output: devpassword
+
+coffer run --ns=production python app.py
+# Output: prodpassword
+```
+
+Priority: `--ns` flag > `COFFER_NS` env var > config `default_ns`.
 
 ---
 
-## 命令参考
+## Agent Usage
 
-| 命令 | 说明 |
-|------|------|
-| `coffer init [--global]` | 初始化配置（本地或全局） |
-| `coffer secret add <name>` | 添加密钥（交互式或 stdin） |
-| `coffer secret update <name>` | 更新已有密钥 |
-| `coffer secret list` | 列出当前命名空间的所有密钥 |
-| `coffer secret get <name>` | 显示密钥值（仅交互式终端） |
-| `coffer secret delete <name>` | 删除密钥 |
-| `coffer check [--json]` | 检查密钥就绪状态 |
-| `coffer run <command>` | 注入密钥并执行命令 |
-| `coffer inject -i <tmpl> -o <out>` | 渲染 `{{coffer:name}}` 模板文件 |
-| `coffer db add <name>` | 注册 PostgreSQL 数据库连接 |
-| `coffer db proxy <name>` | 启动本地数据库代理 |
-| `coffer migrate <env-file>` | 迁移 `.env` 到 keychain |
-| `coffer status` | 显示当前配置状态 |
+Coffer is designed for AI agent workflows. Agents use `coffer check --json` to inspect readiness and `coffer run` to inject secrets without exposing them.
 
-### 全局选项
+### Core Concepts
+
+- **Secret storage**: OS native credential store (macOS Keychain, Linux GNOME Keyring, Windows Credential Manager). Never in the file system.
+- **Namespaces**: Isolate secrets per environment. Fully isolated from each other.
+- **Injection modes**: `env` (environment variables, default) or `file` (temporary files).
+
+### Agent Workflow
+
+1. **Check status** — `coffer check --json` returns whether all secrets are configured
+2. **Prompt the user** — if a secret is missing, ask them to run `coffer secret add <name>` on their terminal
+3. **Verify** — re-run `coffer check --json` to confirm readiness
+4. **Run** — `coffer run <command>` injects secrets without exposing them
+
+JSON response example:
+
+```json
+{
+  "ready": false,
+  "ns": "production",
+  "secrets": [
+    {"name": "db-pwd", "configured": false, "fix": "coffer secret add db-pwd --ns=production"}
+  ]
+}
+```
+
+### Example Interaction
 
 ```
---ns=<namespace>    指定命名空间（优先级：CLI > COFFER_NS > default_ns）
---global            操作全局配置（~/.config/coffer/）
---json              JSON 格式输出（适合 Agent 解析）
---inject=env|file   注入模式（env=环境变量，file=临时文件）
---config=<path>     指定配置文件路径
+Agent: Let me check secret status first.
+$ coffer check --json
+{
+  "ready": false,
+  "ns": "default",
+  "secrets": [
+    {"name": "db-pwd", "configured": false, "fix": "coffer secret add db-pwd"}
+  ]
+}
+
+Agent: The project is missing the db-pwd secret. Please run:
+coffer secret add db-pwd
+
+User: [runs the command and enters the value]
+
+Agent: Secret is configured. Running the app.
+$ coffer run python app.py
 ```
 
-### 命名空间
+### Safety Notes
 
-通过命名空间隔离多环境密钥：
+- `coffer secret get` is blocked in `--json` mode to prevent agents from reading plaintext secrets
+- Environment marker `COFFER_CALLER=1` is set for called processes
+- Different namespaces are fully isolated from each other
+- Secrets never reside in the file system
+
+### Troubleshooting
+
+| Error | Fix |
+|-------|-----|
+| `not initialized` | Run `coffer init` |
+| `secret not found` | Run `coffer secret list` to check, then `coffer secret add <name>` |
+| `secret get is not allowed in JSON mode` | Expected behavior — agents cannot retrieve plaintext secrets |
+| `invalid secret name` | Use only letters, numbers, hyphens, and underscores |
+
+### Best Practices
+
+- Always use `coffer check --json` (not plain `coffer check`) for agent parsing
+- Always check readiness before running commands
+- Use namespaces to separate environments
+- Never use `coffer secret get` in agent workflows — always use `coffer run` for injection
+- When a secret is missing, prompt the user to run `coffer secret add <name>` locally — never ask them to paste the value into chat
+
+---
+
+## Command Reference
+
+| Command | Description |
+|---------|-------------|
+| `coffer init [--global]` | Initialize config (local or global) |
+| `coffer secret add <name>` | Add a secret (interactive or stdin) |
+| `coffer secret update <name>` | Update an existing secret |
+| `coffer secret list` | List secrets in the current namespace |
+| `coffer secret get <name>` | Display a secret value (terminal only) |
+| `coffer secret delete <name>` | Delete a secret |
+| `coffer check [--json]` | Check if all secrets are ready |
+| `coffer run <command>` | Inject secrets and run a command |
+| `coffer inject -i <tmpl> -o <out>` | Render `{{coffer:name}}` templates |
+| `coffer db add <name>` | Register a PostgreSQL connection |
+| `coffer db proxy <name>` | Start a local database proxy |
+| `coffer migrate <env-file>` | Migrate `.env` secrets to keychain |
+| `coffer status` | Show current configuration status |
+
+### Global Options
+
+```
+--ns=<namespace>    Namespace (priority: CLI > COFFER_NS > config default_ns)
+--global            Operate on global config (~/.config/coffer/)
+--json              JSON output (for agent parsing)
+--inject=env|file   Injection mode (env=environment vars, file=temp files)
+--config=<path>     Custom config file path
+```
+
+### Template Injection (`coffer inject`)
+
+For tools that need config files instead of env vars:
 
 ```bash
-coffer secret add DB_PASSWORD --ns=staging
-coffer secret add DB_PASSWORD --ns=production
-coffer run --ns=production python app.py
-```
-
-优先级：`--ns` 参数 > 环境变量 `COFFER_NS` > 配置文件的 `default_ns`。
-
-### 模板注入（`coffer inject`）
-
-对于需要配置文件的工具（非环境变量注入），用模板方式：
-
-```bash
-# 模板文件 config.tmpl
+# Template config.tmpl:
 # ---
 # database:
 #   password: "{{coffer:DB_PASSWORD}}"
@@ -229,48 +347,37 @@ coffer run --ns=production python app.py
 coffer inject -i config.tmpl -o config.yaml --global --ns=prod
 ```
 
-### PostgreSQL 数据库代理
+### PostgreSQL Database Proxy
 
 ```bash
-# 注册连接信息（密码存在 keychain 中）
+# Register connection (password stays in keychain)
 coffer db add my-pg \
   --host db.example.com --port 5432 \
   --user admin --database app --global
 
-# 启动本地代理（监听 127.0.0.1:<port>，自动使用 keychain 中的密码认证）
+# Start proxy — listens on 127.0.0.1:<port>, authenticates using keychain
 coffer db proxy my-pg --global
 ```
 
-客户端连接 `127.0.0.1:<port>` 即可，无需知道数据库密码。
+Clients connect to `127.0.0.1:<port>` without needing the database password.
 
-### 迁移 .env
+### Migrate .env Files
 
 ```bash
-coffer migrate .env --global --ns=prod --dry-run   # 预览
-coffer migrate .env --global --ns=prod              # 执行
+coffer migrate .env --global --ns=prod --dry-run   # Preview
+coffer migrate .env --global --ns=prod              # Execute
 ```
 
-- 敏感值 → keychain
-- `.env` → 自动生成 `{{coffer:name}}` 模板，去掉明文密钥
+- Sensitive values → keychain
+- `.env` → template with `{{coffer:name}}` placeholders, plaintext removed
 
 ---
 
-## Agent 使用说明
+## Configuration Reference
 
-Coffer 专为 AI Agent 设计，详见 [`SKILL.md`](./SKILL.md)。
+### Global Config
 
-核心原则：
-- Agent 用 `coffer check --json` 检查就绪状态，不主动读取密钥值
-- 缺失密钥时，引导用户在本地终端上执行 `coffer secret add <name>`，不应让用户把密钥粘贴到对话中
-- 推荐 `coffer run` 注入密钥，避免密钥暴露在进程列表中
-
----
-
-## 配置参考
-
-### 全局配置
-
-`~/.config/coffer/config.yaml`：
+`~/.config/coffer/config.yaml`:
 
 ```yaml
 default_ns: default
@@ -287,23 +394,20 @@ namespaces:
       DB_PASSWORD: "{{coffer:DB_PASSWORD}}"
 ```
 
-### 本地配置
+### Local Config
 
-`.coffer` 文件格式与全局相同。
+`.coffer` uses the same format.
 
-### 合并规则
+### Merge Rules
 
-- 全局配置作为基础（base）
-- 本地配置覆盖/追加到全局
-- 实际生效的是合并后的结果
-- `--global` 标志只操作全局配置
+- Global config is the base
+- Local config overrides/appends to global
+- `--global` flag operates on global config only
 
----
+## Platform Support
 
-## 平台支持
-
-| 平台 | 后端 | 依赖安装 |
-|------|------|----------|
-| macOS | Keychain (`security`) | 系统自带 |
-| Linux | GNOME Keyring (`secret-tool`) | `apt install libsecret-tools gnome-keyring` |
-| Windows | Credential Manager (`cmdkey`) | 系统自带 |
+| Platform | Backend | Dependencies |
+|----------|---------|-------------|
+| macOS | Keychain (`security`) | Built-in |
+| Linux | GNOME Keyring (`secret-tool`) | `libsecret-tools gnome-keyring` |
+| Windows | Credential Manager (`cmdkey`) | Built-in |
