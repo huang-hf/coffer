@@ -39,6 +39,8 @@ func Run(args []string, stdout io.Writer, stderr io.Writer) int {
 		return runRun(args[1:], stdout, stderr, opts)
 	case "check":
 		return runCheck(args[1:], stdout, stderr, opts)
+	case "inject":
+		return runInject(args[1:], stdout, stderr, opts)
 	case "status":
 		return runStatus(args[1:], stdout, stderr, opts)
 	case "migrate":
@@ -115,6 +117,7 @@ func printUsage(w io.Writer) {
 	fmt.Fprintln(w, "  db list             List database connections")
 	fmt.Fprintln(w, "  db remove <name>    Remove a database connection")
 	fmt.Fprintln(w, "  db proxy <name>     Start database proxy")
+	fmt.Fprintln(w, "  inject              Inject secrets into template")
 	fmt.Fprintln(w, "  run <command>       Run command with secrets injected")
 	fmt.Fprintln(w, "  check               Check if secrets are ready")
 	fmt.Fprintln(w, "  status              Show current status")
