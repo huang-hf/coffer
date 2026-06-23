@@ -5,6 +5,8 @@ package secret
 import (
 	"fmt"
 	"os/exec"
+	"regexp"
+	"sort"
 	"strings"
 )
 
@@ -79,26 +81,40 @@ func (k *KeychainStore) List(namespace string) ([]string, error) {
 		return nil, fmt.Errorf("failed to list secrets from Keychain: %w, output: %s", err, string(output))
 	}
 
-	var secrets []string
+	acctPattern := regexp.MustCompile(`"acct"<[^>]*>="([^"]*)"`)
+	svcePattern := regexp.MustCompile(`"svce"<[^>]*>="([^"]*)"`)
+	items := make(map[string]struct{})
 	lines := strings.Split(string(output), "\n")
-
 	servicePattern := k.serviceName + "." + namespace
-	for i, line := range lines {
-		if strings.Contains(line, servicePattern) {
-			for j := i + 1; j < len(lines) && j < i+10; j++ {
-				if strings.Contains(lines[j], "\"acct\"") {
-					parts := strings.SplitN(lines[j], "=", 2)
-					if len(parts) == 2 {
-						name := strings.Trim(strings.TrimSpace(parts[1]), "\"")
-						if name != "" && name != "<NULL>" {
-							secrets = append(secrets, name)
-						}
-					}
-					break
-				}
-			}
+
+	var acct string
+	var svce string
+	flush := func() {
+		if svce == servicePattern && acct != "" && acct != "<NULL>" {
+			items[acct] = struct{}{}
+		}
+		acct = ""
+		svce = ""
+	}
+
+	for _, line := range lines {
+		if strings.HasPrefix(line, "keychain:") && (acct != "" || svce != "") {
+			flush()
+		}
+		if match := acctPattern.FindStringSubmatch(line); len(match) == 2 {
+			acct = match[1]
+		}
+		if match := svcePattern.FindStringSubmatch(line); len(match) == 2 {
+			svce = match[1]
 		}
 	}
+	flush()
+
+	secrets := make([]string, 0, len(items))
+	for name := range items {
+		secrets = append(secrets, name)
+	}
+	sort.Strings(secrets)
 
 	return secrets, nil
 }

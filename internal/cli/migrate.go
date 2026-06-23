@@ -38,37 +38,35 @@ var nonSensitivePatterns = []*regexp.Regexp{
 }
 
 type migrateOptions struct {
-	envFile     string
-	template    string
-	namespace   string
-	dryRun      bool
-	force       bool
+	envFile   string
+	template  string
+	namespace string
+	dryRun    bool
+	force     bool
 }
 
 type envEntry struct {
 	key       string
 	value     string
 	isComment bool
- isEmpty   bool
+	isEmpty   bool
 	original  string
 }
 
 func runMigrate(args []string, stdout io.Writer, stderr io.Writer, opts *Options) int {
+	if isHelp(args) {
+		printMigrateUsage(stdout)
+		return 0
+	}
 	if len(args) == 0 {
-		fmt.Fprintln(stderr, "Usage: coffer migrate <env-file> [options]")
-		fmt.Fprintln(stderr, "")
-		fmt.Fprintln(stderr, "Options:")
-		fmt.Fprintln(stderr, "  --template=<path>    Target template file (default: .env.template)")
-		fmt.Fprintln(stderr, "  --namespace=<name>   Target namespace (default: 'default')")
-		fmt.Fprintln(stderr, "  --dry-run            Only generate template, don't store secrets")
-		fmt.Fprintln(stderr, "  --force              Skip confirmation")
+		printMigrateUsage(stderr)
 		return 1
 	}
 
 	mOpts := &migrateOptions{
 		envFile:   args[0],
 		template:  ".env.template",
-		namespace: "default",
+		namespace: opts.NS,
 	}
 
 	// Parse flags
@@ -78,6 +76,9 @@ func runMigrate(args []string, stdout io.Writer, stderr io.Writer, opts *Options
 			mOpts.template = strings.TrimPrefix(arg, "--template=")
 		case strings.HasPrefix(arg, "--namespace="):
 			mOpts.namespace = strings.TrimPrefix(arg, "--namespace=")
+		case arg == "--namespace" && len(arg) > 0:
+			fmt.Fprintln(stderr, "Error: use --namespace=<name> or --ns=<name>")
+			return 1
 		case arg == "--dry-run":
 			mOpts.dryRun = true
 		case arg == "--force":
@@ -157,10 +158,14 @@ func runMigrate(args []string, stdout io.Writer, stderr io.Writer, opts *Options
 		}
 	}
 
-	// Load config
-	cfg, err := config.Load(".coffer")
+	cfgPath := configPath(opts)
+	cfg, err := config.Load(cfgPath)
 	if err != nil {
-		fmt.Fprintf(stderr, "Error: not initialized. Run 'coffer init' first\n")
+		if opts.Global {
+			fmt.Fprintf(stderr, "Error: global config not found. Run 'coffer init --global' first\n")
+		} else {
+			fmt.Fprintf(stderr, "Error: not initialized. Run 'coffer init' first\n")
+		}
 		return 1
 	}
 
@@ -184,29 +189,17 @@ func runMigrate(args []string, stdout io.Writer, stderr io.Writer, opts *Options
 			fmt.Fprintf(stdout, "   ✓ %s\n", entry.key)
 		}
 
-		if cfg.Secrets == nil {
-			cfg.Secrets = make(map[string]string)
-		}
-		if cfg.Namespaces == nil {
-			cfg.Namespaces = make(map[string]*config.NamespaceConfig)
-		}
-
-		if _, ok := cfg.Namespaces[ns]; !ok {
-			cfg.Namespaces[ns] = &config.NamespaceConfig{
-				Secrets: make(map[string]string),
-			}
-		}
-
 		for _, entry := range sensitive {
 			placeholder := fmt.Sprintf("{{coffer:%s}}", entry.key)
-			cfg.Secrets[entry.key] = placeholder
-			cfg.Namespaces[ns].Secrets[entry.key] = placeholder
+			cfg.SetSecretForNamespace(ns, entry.key, placeholder)
 		}
 
-		cfg.Inject = "file"
-		cfg.Config = mOpts.template
+		cfg.Inject = opts.Inject
+		if opts.Inject == "file" {
+			cfg.Config = mOpts.template
+		}
 
-		if err := config.Save(cfg, ".coffer"); err != nil {
+		if err := config.Save(cfg, cfgPath); err != nil {
 			fmt.Fprintf(stderr, "Error saving config: %v\n", err)
 			return 1
 		}
@@ -228,10 +221,23 @@ func runMigrate(args []string, stdout io.Writer, stderr io.Writer, opts *Options
 	fmt.Fprintf(stdout, "\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")
 	fmt.Fprintf(stdout, "✅ Migration complete!\n\n")
 	fmt.Fprintf(stdout, "Next steps:\n")
-	fmt.Fprintf(stdout, "   1. Test: coffer run --inject=file cat %s\n", mOpts.template)
-	fmt.Fprintf(stdout, "   2. Run:  coffer run --inject=file <your-command>\n")
+	fmt.Fprintf(stdout, "   1. Test: coffer inject -i %s\n", mOpts.template)
+	fmt.Fprintf(stdout, "   2. Run:  coffer run --inject=%s <your-command>\n", opts.Inject)
 
 	return 0
+}
+
+func printMigrateUsage(w io.Writer) {
+	fmt.Fprintln(w, "Usage: coffer migrate <env-file> [options]")
+	fmt.Fprintln(w)
+	fmt.Fprintln(w, "Options:")
+	fmt.Fprintln(w, "  --template=<path>    Target template file (default: .env.template)")
+	fmt.Fprintln(w, "  --ns=<name>          Target namespace")
+	fmt.Fprintln(w, "  --namespace=<name>   Target namespace (legacy alias)")
+	fmt.Fprintln(w, "  --inject=<mode>      Injection mode: env or file")
+	fmt.Fprintln(w, "  --global             Migrate into global config")
+	fmt.Fprintln(w, "  --dry-run            Only generate template, don't store secrets")
+	fmt.Fprintln(w, "  --force              Skip confirmation")
 }
 
 func parseEnvFile(path string) ([]envEntry, error) {

@@ -8,11 +8,11 @@ import (
 )
 
 type Options struct {
-	NS        string
-	JSON      bool
-	Inject    string
-	Config    string
-	Global    bool
+	NS     string
+	JSON   bool
+	Inject string
+	Config string
+	Global bool
 }
 
 // Run is the main entry point for the CLI
@@ -101,6 +101,10 @@ func parseGlobalFlags(args *[]string) (*Options, error) {
 
 	*args = remaining
 	return opts, nil
+}
+
+func isHelp(args []string) bool {
+	return len(args) > 0 && (args[0] == "--help" || args[0] == "-h")
 }
 
 func printUsage(w io.Writer) {

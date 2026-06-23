@@ -15,8 +15,12 @@ import (
 )
 
 func runDB(args []string, stdout io.Writer, stderr io.Writer, opts *Options) int {
+	if isHelp(args) {
+		printDBUsage(stdout)
+		return 0
+	}
 	if len(args) == 0 {
-		fmt.Fprintln(stderr, "Usage: coffer db <add|list|remove|proxy> [options]")
+		printDBUsage(stderr)
 		return 1
 	}
 
@@ -35,7 +39,21 @@ func runDB(args []string, stdout io.Writer, stderr io.Writer, opts *Options) int
 	}
 }
 
+func printDBUsage(w io.Writer) {
+	fmt.Fprintln(w, "Usage: coffer db <add|list|remove|proxy> [options]")
+	fmt.Fprintln(w)
+	fmt.Fprintln(w, "Commands:")
+	fmt.Fprintln(w, "  add <name>     Add a PostgreSQL connection")
+	fmt.Fprintln(w, "  list           List database connections")
+	fmt.Fprintln(w, "  remove <name>  Remove a database connection")
+	fmt.Fprintln(w, "  proxy <name>   Start a local database proxy")
+}
+
 func runDBAdd(args []string, stdout io.Writer, stderr io.Writer, opts *Options) int {
+	if isHelp(args) {
+		fmt.Fprintln(stdout, "Usage: coffer db add <name> --host <host> --port <port> --user <user> --database <db> [--type postgres]")
+		return 0
+	}
 	var name, host, user, database, dbType string
 	var port int
 
@@ -141,6 +159,10 @@ func parseDBAddFlags(args []string, name, host, user, database, dbType *string, 
 }
 
 func runDBList(args []string, stdout io.Writer, stderr io.Writer, opts *Options) int {
+	if isHelp(args) {
+		fmt.Fprintln(stdout, "Usage: coffer db list [--global]")
+		return 0
+	}
 	if len(args) > 0 {
 		fmt.Fprintln(stderr, "Usage: coffer db list [--global]")
 		return 1
@@ -171,6 +193,10 @@ func runDBList(args []string, stdout io.Writer, stderr io.Writer, opts *Options)
 }
 
 func runDBRemove(args []string, stdout io.Writer, stderr io.Writer, opts *Options) int {
+	if isHelp(args) {
+		fmt.Fprintln(stdout, "Usage: coffer db remove <name> [--global]")
+		return 0
+	}
 	if len(args) != 1 {
 		fmt.Fprintln(stderr, "Usage: coffer db remove <name> [--global]")
 		return 1
@@ -192,6 +218,10 @@ func runDBRemove(args []string, stdout io.Writer, stderr io.Writer, opts *Option
 }
 
 func runDBProxy(args []string, stdout io.Writer, stderr io.Writer, opts *Options) int {
+	if isHelp(args) {
+		fmt.Fprintln(stdout, "Usage: coffer db proxy <name> [--global]")
+		return 0
+	}
 	if len(args) != 1 {
 		fmt.Fprintln(stderr, "Usage: coffer db proxy <name> [--global]")
 		return 1

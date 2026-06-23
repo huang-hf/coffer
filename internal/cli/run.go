@@ -13,14 +13,28 @@ import (
 )
 
 func runRun(args []string, stdout io.Writer, stderr io.Writer, opts *Options) int {
+	if isHelp(args) {
+		printRunUsage(stdout)
+		return 0
+	}
 	if len(args) == 0 {
-		fmt.Fprintln(stderr, "Usage: coffer run <command> [args...]")
+		printRunUsage(stderr)
 		return 1
 	}
 
-	cfg, err := config.LoadChain(".coffer")
+	var cfg *config.Config
+	var err error
+	if opts.Global {
+		cfg, err = config.Load(config.GlobalConfigPath())
+	} else {
+		cfg, err = config.LoadChain(".coffer")
+	}
 	if err != nil {
-		fmt.Fprintf(stderr, "Error: not initialized. Run 'coffer init' first\n")
+		if opts.Global {
+			fmt.Fprintf(stderr, "Error: global config not found. Run 'coffer init --global' first\n")
+		} else {
+			fmt.Fprintf(stderr, "Error: not initialized. Run 'coffer init' first\n")
+		}
 		return 1
 	}
 
@@ -44,8 +58,7 @@ func runRun(args []string, stdout io.Writer, stderr io.Writer, opts *Options) in
 			return 1
 		}
 
-		envName := secretNameToEnvName(secretName)
-		env = append(env, envName+"="+string(value))
+		env = append(env, secretName+"="+string(value))
 	}
 
 	if opts.Inject == "file" && cfg.Config != "" {
@@ -76,6 +89,11 @@ func runRun(args []string, stdout io.Writer, stderr io.Writer, opts *Options) in
 	return 0
 }
 
-func secretNameToEnvName(name string) string {
-	return strings.ToUpper(strings.ReplaceAll(name, "-", "_"))
+func printRunUsage(w io.Writer) {
+	fmt.Fprintln(w, "Usage: coffer run <command> [args...]")
+	fmt.Fprintln(w)
+	fmt.Fprintln(w, "Options:")
+	fmt.Fprintln(w, "  --ns=<namespace> Specify namespace")
+	fmt.Fprintln(w, "  --global         Use global config")
+	fmt.Fprintln(w, "  --inject=<mode>  Injection mode: env or file")
 }

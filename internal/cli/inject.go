@@ -11,6 +11,11 @@ import (
 )
 
 func runInject(args []string, stdout io.Writer, stderr io.Writer, opts *Options) int {
+	if isHelp(args) {
+		printInjectUsage(stdout)
+		return 0
+	}
+
 	var inputFile, outputFile string
 
 	for i := 0; i < len(args); i++ {
@@ -36,7 +41,7 @@ func runInject(args []string, stdout io.Writer, stderr io.Writer, opts *Options)
 			i++
 			outputFile = args[i]
 		default:
-			fmt.Fprintf(stderr, "Usage: coffer inject [-i <input>] [-o <output>] [--ns=<ns>]\n")
+			printInjectUsage(stderr)
 			return 1
 		}
 	}
@@ -47,10 +52,18 @@ func runInject(args []string, stdout io.Writer, stderr io.Writer, opts *Options)
 		return 1
 	}
 
-	cfg, err := config.LoadChain(".coffer")
+	var cfg *config.Config
+	if opts.Global {
+		cfg, err = config.Load(config.GlobalConfigPath())
+	} else {
+		cfg, err = config.LoadChain(".coffer")
+	}
 	if err != nil {
-		fmt.Fprintf(stderr, "Error: not initialized. Run 'coffer init' first\n")
-		fmt.Fprintf(stderr, "Or use --global to load global config only\n")
+		if opts.Global {
+			fmt.Fprintf(stderr, "Error: global config not found. Run 'coffer init --global' first\n")
+		} else {
+			fmt.Fprintf(stderr, "Error: not initialized. Run 'coffer init' first\n")
+		}
 		return 1
 	}
 
@@ -85,6 +98,16 @@ func runInject(args []string, stdout io.Writer, stderr io.Writer, opts *Options)
 	}
 
 	return 0
+}
+
+func printInjectUsage(w io.Writer) {
+	fmt.Fprintln(w, "Usage: coffer inject [-i <input>] [-o <output>] [--ns=<namespace>] [--global]")
+	fmt.Fprintln(w)
+	fmt.Fprintln(w, "Options:")
+	fmt.Fprintln(w, "  -i, --input <path>   Template input file (default: stdin)")
+	fmt.Fprintln(w, "  -o, --output <path>  Rendered output file (default: stdout)")
+	fmt.Fprintln(w, "  --ns=<namespace>     Specify namespace")
+	fmt.Fprintln(w, "  --global             Use global config")
 }
 
 func readInput(path string) (string, error) {

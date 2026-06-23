@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sort"
 	"strings"
 
 	"golang.org/x/term"
@@ -14,8 +15,12 @@ import (
 )
 
 func runSecret(args []string, stdout io.Writer, stderr io.Writer, opts *Options) int {
+	if isHelp(args) {
+		printSecretUsage(stdout)
+		return 0
+	}
 	if len(args) == 0 {
-		fmt.Fprintln(stderr, "Usage: coffer secret <add|update|list|delete|get> [name]")
+		printSecretUsage(stderr)
 		return 1
 	}
 
@@ -36,6 +41,22 @@ func runSecret(args []string, stdout io.Writer, stderr io.Writer, opts *Options)
 	}
 }
 
+func printSecretUsage(w io.Writer) {
+	fmt.Fprintln(w, "Usage: coffer secret <add|update|list|delete|get> [name]")
+	fmt.Fprintln(w)
+	fmt.Fprintln(w, "Commands:")
+	fmt.Fprintln(w, "  add <name>       Add a secret")
+	fmt.Fprintln(w, "  update <name>    Update a secret")
+	fmt.Fprintln(w, "  list             List configured secrets")
+	fmt.Fprintln(w, "  delete <name>    Delete a secret")
+	fmt.Fprintln(w, "  get <name>       Print a secret value")
+	fmt.Fprintln(w)
+	fmt.Fprintln(w, "Options:")
+	fmt.Fprintln(w, "  --ns=<namespace> Specify namespace")
+	fmt.Fprintln(w, "  --global         Use global config")
+	fmt.Fprintln(w, "  --json           JSON output where supported")
+}
+
 // configPath returns the config file path based on global flag
 func configPath(opts *Options) string {
 	if opts.Global {
@@ -45,6 +66,10 @@ func configPath(opts *Options) string {
 }
 
 func runSecretAdd(args []string, stdout io.Writer, stderr io.Writer, opts *Options) int {
+	if isHelp(args) {
+		fmt.Fprintln(stdout, "Usage: coffer secret add <name> [--ns=<namespace>] [--global]")
+		return 0
+	}
 	if len(args) != 1 {
 		fmt.Fprintln(stderr, "Usage: coffer secret add <name> [--ns=<namespace>] [--global]")
 		return 1
@@ -108,6 +133,10 @@ func runSecretAdd(args []string, stdout io.Writer, stderr io.Writer, opts *Optio
 }
 
 func runSecretUpdate(args []string, stdout io.Writer, stderr io.Writer, opts *Options) int {
+	if isHelp(args) {
+		fmt.Fprintln(stdout, "Usage: coffer secret update <name> [--ns=<namespace>] [--global]")
+		return 0
+	}
 	if len(args) != 1 {
 		fmt.Fprintln(stderr, "Usage: coffer secret update <name> [--ns=<namespace>] [--global]")
 		return 1
@@ -174,6 +203,10 @@ func runSecretUpdate(args []string, stdout io.Writer, stderr io.Writer, opts *Op
 }
 
 func runSecretList(args []string, stdout io.Writer, stderr io.Writer, opts *Options) int {
+	if isHelp(args) {
+		fmt.Fprintln(stdout, "Usage: coffer secret list [--ns=<namespace>] [--global]")
+		return 0
+	}
 	if len(args) > 0 {
 		fmt.Fprintln(stderr, "Usage: coffer secret list [--ns=<namespace>] [--global]")
 		return 1
@@ -200,17 +233,8 @@ func runSecretList(args []string, stdout io.Writer, stderr io.Writer, opts *Opti
 		ns = cfg.ResolveNamespace(opts.NS)
 	}
 
-	store, err := secret.NewStore()
-	if err != nil {
-		fmt.Fprintf(stderr, "Error creating secret store: %v\n", err)
-		return 1
-	}
-
-	secrets, err := store.List(ns)
-	if err != nil {
-		fmt.Fprintf(stderr, "Error listing secrets: %v\n", err)
-		return 1
-	}
+	secrets := cfg.ListSecretsForNamespace(ns)
+	sort.Strings(secrets)
 
 	if opts.JSON {
 		output := map[string]interface{}{
@@ -239,6 +263,10 @@ func runSecretList(args []string, stdout io.Writer, stderr io.Writer, opts *Opti
 }
 
 func runSecretDelete(args []string, stdout io.Writer, stderr io.Writer, opts *Options) int {
+	if isHelp(args) {
+		fmt.Fprintln(stdout, "Usage: coffer secret delete <name> [--ns=<namespace>] [--global]")
+		return 0
+	}
 	if len(args) != 1 {
 		fmt.Fprintln(stderr, "Usage: coffer secret delete <name> [--ns=<namespace>] [--global]")
 		return 1
@@ -294,6 +322,10 @@ func runSecretDelete(args []string, stdout io.Writer, stderr io.Writer, opts *Op
 }
 
 func runSecretGet(args []string, stdout io.Writer, stderr io.Writer, opts *Options) int {
+	if isHelp(args) {
+		fmt.Fprintln(stdout, "Usage: coffer secret get <name> [--ns=<namespace>] [--global]")
+		return 0
+	}
 	if len(args) != 1 {
 		fmt.Fprintln(stderr, "Usage: coffer secret get <name> [--ns=<namespace>] [--global]")
 		return 1
@@ -350,7 +382,7 @@ func readPassword(stderr io.Writer) (string, error) {
 	// Not a terminal — read from stdin line
 	reader := bufio.NewReader(os.Stdin)
 	value, err := reader.ReadString('\n')
-	if err != nil {
+	if err != nil && !(err == io.EOF && value != "") {
 		return "", err
 	}
 	return strings.TrimRight(value, "\r\n"), nil
