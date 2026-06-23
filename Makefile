@@ -1,7 +1,11 @@
 .PHONY: build install test clean
 
+# Sync SKILL.md to embed copy (run after editing SKILL.md)
+sync-skill:
+	cp SKILL.md internal/skill/SKILL.md
+
 # Build the coffer binary
-build:
+build: sync-skill
 	go build -o coffer ./cmd/coffer
 
 # Install to /usr/local/bin (requires sudo)

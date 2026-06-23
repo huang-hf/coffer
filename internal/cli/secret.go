@@ -10,8 +10,8 @@ import (
 
 	"golang.org/x/term"
 
-	"coffer/internal/config"
-	"coffer/internal/secret"
+	"github.com/huang-hf/coffer/internal/config"
+	"github.com/huang-hf/coffer/internal/secret"
 )
 
 func runSecret(args []string, stdout io.Writer, stderr io.Writer, opts *Options) int {

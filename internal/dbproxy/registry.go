@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"regexp"
 
-	"coffer/internal/config"
-	"coffer/internal/secret"
+	"github.com/huang-hf/coffer/internal/config"
+	"github.com/huang-hf/coffer/internal/secret"
 )
 
 var safeNamePattern = regexp.MustCompile(`^[A-Za-z0-9_-]+$`)

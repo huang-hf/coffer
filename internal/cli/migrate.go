@@ -8,8 +8,8 @@ import (
 	"regexp"
 	"strings"
 
-	"coffer/internal/config"
-	"coffer/internal/secret"
+	"github.com/huang-hf/coffer/internal/config"
+	"github.com/huang-hf/coffer/internal/secret"
 )
 
 var sensitivePatterns = []*regexp.Regexp{

@@ -6,7 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"coffer/internal/config"
+	"github.com/huang-hf/coffer/internal/config"
 )
 
 func runInit(args []string, stdout io.Writer, stderr io.Writer, opts *Options) int {

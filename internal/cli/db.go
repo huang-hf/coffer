@@ -8,10 +8,10 @@ import (
 	"strconv"
 	"strings"
 
-	"coffer/internal/config"
-	"coffer/internal/dbproxy"
-	"coffer/internal/dbproxy/pg"
-	"coffer/internal/secret"
+	"github.com/huang-hf/coffer/internal/config"
+	"github.com/huang-hf/coffer/internal/dbproxy"
+	"github.com/huang-hf/coffer/internal/dbproxy/pg"
+	"github.com/huang-hf/coffer/internal/secret"
 )
 
 func runDB(args []string, stdout io.Writer, stderr io.Writer, opts *Options) int {

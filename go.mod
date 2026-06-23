@@ -1,4 +1,4 @@
-module coffer
+module github.com/huang-hf/coffer
 
 go 1.25.0
 

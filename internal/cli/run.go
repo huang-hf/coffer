@@ -7,9 +7,9 @@ import (
 	"os/exec"
 	"strings"
 
-	"coffer/internal/config"
-	"coffer/internal/inject"
-	"coffer/internal/secret"
+	"github.com/huang-hf/coffer/internal/config"
+	"github.com/huang-hf/coffer/internal/inject"
+	"github.com/huang-hf/coffer/internal/secret"
 )
 
 func runRun(args []string, stdout io.Writer, stderr io.Writer, opts *Options) int {

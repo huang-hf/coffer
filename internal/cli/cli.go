@@ -45,6 +45,10 @@ func Run(args []string, stdout io.Writer, stderr io.Writer) int {
 		return runStatus(args[1:], stdout, stderr, opts)
 	case "migrate":
 		return runMigrate(args[1:], stdout, stderr, opts)
+	case "install-claude-code":
+		return runInstallSkill("claude-code", stdout, stderr)
+	case "install-codex":
+		return runInstallSkill("codex", stdout, stderr)
 	case "--help", "-h":
 		printUsage(stdout)
 		return 0
@@ -126,6 +130,8 @@ func printUsage(w io.Writer) {
 	fmt.Fprintln(w, "  check               Check if secrets are ready")
 	fmt.Fprintln(w, "  status              Show current status")
 	fmt.Fprintln(w, "  migrate <env-file>  Migrate .env file to coffer")
+	fmt.Fprintln(w, "  install-claude-code Install/update Claude Code skill")
+	fmt.Fprintln(w, "  install-codex       Install/update Codex skill")
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, "Global Options:")
 	fmt.Fprintln(w, "  --ns=<namespace>    Specify namespace (default: 'default')")

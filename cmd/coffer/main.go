@@ -3,7 +3,7 @@ package main
 import (
 	"os"
 
-	"coffer/internal/cli"
+	"github.com/huang-hf/coffer/internal/cli"
 )
 
 func main() {
