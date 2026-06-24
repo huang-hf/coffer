@@ -14,7 +14,8 @@ type Store interface {
 	List(namespace string) ([]string, error)
 }
 
-func getStoreDir() (string, error) {
+// StoreDir returns the path to the coffer store directory (~/.coffer/).
+func StoreDir() (string, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return "", fmt.Errorf("getting home directory: %w", err)
