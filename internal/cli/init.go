@@ -1,12 +1,14 @@
 package cli
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 
 	"github.com/huang-hf/coffer/internal/config"
+	"github.com/huang-hf/coffer/internal/secret"
 )
 
 func runInit(args []string, stdout io.Writer, stderr io.Writer, opts *Options) int {
@@ -42,6 +44,10 @@ func runInit(args []string, stdout io.Writer, stderr io.Writer, opts *Options) i
 		return 1
 	}
 
+	if code := initAgeKey(stdout, stderr); code != 0 {
+		return code
+	}
+
 	fmt.Fprintln(stdout, "✓ Created .coffer")
 	fmt.Fprintln(stdout)
 	fmt.Fprintln(stdout, "Next steps:")
@@ -57,7 +63,6 @@ func runInitGlobal(stdout io.Writer, stderr io.Writer) int {
 		return 1
 	}
 
-	// Create parent directory
 	dir := filepath.Dir(globalPath)
 	if err := os.MkdirAll(dir, 0700); err != nil {
 		fmt.Fprintf(stderr, "Error creating config directory: %v\n", err)
@@ -80,10 +85,34 @@ func runInitGlobal(stdout io.Writer, stderr io.Writer) int {
 		return 1
 	}
 
+	if code := initAgeKey(stdout, stderr); code != 0 {
+		return code
+	}
+
 	fmt.Fprintf(stdout, "✓ Created global config at %s\n", globalPath)
 	fmt.Fprintln(stdout)
 	fmt.Fprintln(stdout, "Next steps:")
 	fmt.Fprintln(stdout, "  1. Add global secrets: coffer secret add --global <name>")
 	fmt.Fprintln(stdout, "  2. Use in any project: coffer run <command>")
+	return 0
+}
+
+func initAgeKey(stdout io.Writer, stderr io.Writer) int {
+	storeDir, err := secret.StoreDir()
+	if err != nil {
+		fmt.Fprintf(stderr, "Error determining store directory: %v\n", err)
+		return 1
+	}
+
+	if err := secret.EnsureAgeKey(storeDir); err != nil {
+		if errors.Is(err, secret.ErrAgeKeyAlreadyExists) {
+			// age key already exists — not an error on re-init
+			return 0
+		}
+		fmt.Fprintf(stderr, "Error generating age key: %v\n", err)
+		return 1
+	}
+
+	fmt.Fprintf(stdout, "✓ Created age encryption key at %s\n", secret.AgeKeyPath(storeDir))
 	return 0
 }
