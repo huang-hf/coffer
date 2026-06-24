@@ -4,9 +4,17 @@ package secret
 
 import (
 	"fmt"
+	"os"
 	"os/exec"
 	"strings"
 )
+
+func NewStore() (Store, error) {
+	if os.Getenv("COFFER_USE_CMDKEY") == "true" {
+		return NewWindowsSecretStore("coffer"), nil
+	}
+	return newFileStore()
+}
 
 type WindowsSecretStore struct {
 	serviceName string

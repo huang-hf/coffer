@@ -4,6 +4,7 @@ package secret
 
 import (
 	"fmt"
+	"os"
 	"os/exec"
 	"strings"
 )
@@ -67,6 +68,13 @@ func (l *LinuxSecretStore) Delete(namespace, name string) error {
 	}
 
 	return nil
+}
+
+func NewStore() (Store, error) {
+	if os.Getenv("COFFER_USE_SECRET_TOOL") == "true" {
+		return NewLinuxSecretStore("coffer"), nil
+	}
+	return newFileStore()
 }
 
 func (l *LinuxSecretStore) List(namespace string) ([]string, error) {
