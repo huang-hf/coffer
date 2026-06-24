@@ -2,7 +2,9 @@
 
 Secure secret management for AI agents and development workflows.
 
-Coffer stores secrets in your OS native credential store (macOS Keychain, Linux GNOME Keyring, Windows Credential Manager) and injects them into commands via environment variables, file templates, or local database proxies. Secrets never live in plain-text files.
+Coffer stores secrets in `~/.coffer/` as owner-only-readable JSON files (0600) and injects them into commands via environment variables, file templates, or local database proxies. Secrets never live in project files, `.env`, or source control.
+
+System keyring backends (macOS Keychain, Linux GNOME Keyring, Windows Credential Manager) are available as opt-in via environment variables.
 
 ---
 
@@ -35,35 +37,13 @@ coffer secret add AWS_SECRET_ACCESS_KEY --global --ns=aws
 
 ### Prerequisites
 
-| Platform | Dependency | Notes |
-|----------|-----------|-------|
-| **macOS** | `security` | Built-in, nothing to install |
-| **Linux** | `secret-tool` (`libsecret`) + running keyring daemon | See below |
-| **Windows** | `cmdkey` | Built-in |
+None. Coffer uses a file-based store by default (`~/.coffer/`, 0600 permissions). System keyring backends are opt-in only.
 
-#### Linux Dependencies
-
-```bash
-# Debian / Ubuntu
-sudo apt-get update && sudo apt-get install -y libsecret-tools gnome-keyring
-
-# RHEL / CentOS / Fedora
-sudo yum install -y libsecret-tools gnome-keyring
-```
-
-Headless Linux servers need a D-Bus session and a keyring daemon:
-
-```bash
-export $(dbus-launch)
-echo -n 'any-password' | gnome-keyring-daemon --unlock --daemonize --components=secrets
-
-# Verify
-echo 'test' | secret-tool store --label=test service coffer name coffer.test.test
-secret-tool lookup service coffer name coffer.test.test
-secret-tool clear service coffer name coffer.test.test
-```
-
-> Add `dbus-launch` and `gnome-keyring-daemon` to your `~/.bashrc` or `~/.zshrc` for automatic setup on login.
+| Opt-in backend | Env var | Platform |
+|---------------|---------|----------|
+| macOS Keychain | `COFFER_USE_KEYCHAIN=true` | macOS |
+| Linux GNOME Keyring | `COFFER_USE_SECRET_TOOL=true` | Linux |
+| Windows Credential Manager | `COFFER_USE_CMDKEY=true` | Windows |
 
 ### Option A: Cross-compile and deploy (recommended for servers)
 
@@ -219,7 +199,7 @@ Priority: `--ns` flag > `COFFER_NS` env var > config `default_ns`.
 | `coffer db list` | List registered database connections |
 | `coffer db remove <name>` | Remove a database connection |
 | `coffer db proxy <name>` | Start a local database proxy |
-| `coffer migrate <env-file>` | Migrate `.env` secrets to keychain |
+| `coffer migrate <env-file>` | Migrate `.env` secrets into coffer |
 | `coffer status` | Show current configuration status |
 | `coffer install-claude-code` | Install/update skill for Claude Code |
 | `coffer install-codex` | Install/update skill for Codex |
@@ -252,7 +232,7 @@ coffer inject -i config.tmpl -o config.yaml --global --ns=prod
 
 ### PostgreSQL Database Proxy
 
-Register a database connection (password stays in keychain):
+Register a database connection (password stays in coffer store):
 ```bash
 coffer db add my-pg \
   --host db.example.com --port 5432 \
@@ -273,7 +253,7 @@ coffer migrate .env --global --ns=prod --dry-run   # Preview
 coffer migrate .env --global --ns=prod              # Execute
 ```
 
-- Sensitive values → keychain
+- Sensitive values → coffer store (`~/.coffer/`)
 - `.env` → template with `{{coffer:name}}` placeholders
 
 ---
@@ -326,8 +306,8 @@ namespaces:
 
 ## Platform Support
 
-| Platform | Backend | Dependencies |
-|----------|---------|-------------|
-| macOS | Keychain (`security`) | Built-in |
-| Linux | GNOME Keyring (`secret-tool`) | `libsecret-tools gnome-keyring` |
-| Windows | Credential Manager (`cmdkey`) | Built-in |
+| Platform | Default backend | Opt-in system keyring |
+|----------|----------------|----------------------|
+| macOS | File store (`~/.coffer/`) | `COFFER_USE_KEYCHAIN=true` → Keychain |
+| Linux | File store (`~/.coffer/`) | `COFFER_USE_SECRET_TOOL=true` → GNOME Keyring |
+| Windows | File store (`~/.coffer/`) | `COFFER_USE_CMDKEY=true` → Credential Manager |
