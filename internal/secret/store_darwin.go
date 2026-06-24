@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 )
 
+// Store is the interface for secret storage backends.
 type Store interface {
 	Set(namespace, name string, value []byte) error
 	Get(namespace, name string) ([]byte, error)
@@ -15,8 +16,15 @@ type Store interface {
 	List(namespace string) ([]string, error)
 }
 
+// NewStore creates a secret store for macOS.
+//
+// By default it uses the file-based store (no keychain dialog).
+// To use the system Keychain instead, set COFFER_USE_KEYCHAIN=true.
 func NewStore() (Store, error) {
-	return NewKeychainStore("coffer"), nil
+	if os.Getenv("COFFER_USE_KEYCHAIN") == "true" {
+		return NewKeychainStore("coffer"), nil
+	}
+	return newFileStore()
 }
 
 func getStoreDir() (string, error) {

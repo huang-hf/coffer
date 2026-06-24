@@ -24,8 +24,7 @@ func NewKeychainStore(serviceName string) *KeychainStore {
 
 // Set stores a secret in macOS Keychain
 func (k *KeychainStore) Set(namespace, name string, value []byte) error {
-	_ = k.Delete(namespace, name)
-
+	// No Delete() call needed — the -U flag below handles both create and update.
 	cmd := exec.Command("security", "add-generic-password",
 		"-a", name,
 		"-s", k.serviceName+"."+namespace,
