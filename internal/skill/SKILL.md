@@ -119,11 +119,35 @@ Use this when a tool needs a config file rather than environment variables.
 
 ### Migrate `.env`
 
-```bash
-coffer migrate <env-file> [--global] [--ns=<namespace>] [--inject=env|file] [--template=<path>] [--dry-run] [--force]
-```
+Quickly import an existing `.env` file into coffer. Sensitive keys (matching `PASSWORD`, `SECRET`, `KEY`, `TOKEN`, `AWS_*`, etc.) are stored in coffer; the rest stay in the template.
 
-Migrate sensitive keys from `.env` into the store and generate a template with `{{coffer:name}}` placeholders.
+```bash
+# Preview only
+coffer migrate .env --global --ns=prod --dry-run
+
+# Expected output:
+# 🔐 Sensitive keys (will be migrated):
+#   DATABASE_PASSWORD
+#   API_SECRET_KEY
+#   AWS_ACCESS_KEY_ID
+#
+# ⚠️  Found 3 sensitive key(s) to migrate.
+# 📝 Template will be written to: .env.template
+# 🔧 Dry-run mode: no secrets were stored.
+
+# Execute migration
+coffer migrate .env --global --ns=prod
+
+# After migration, .env.template will look like:
+#   DATABASE_PASSWORD={{coffer:DATABASE_PASSWORD}}
+#   API_SECRET_KEY={{coffer:API_SECRET_KEY}}
+#   AWS_ACCESS_KEY_ID={{coffer:AWS_ACCESS_KEY_ID}}
+#   HOST=localhost            ← non-sensitive, kept as-is
+#   PORT=5432                 ← non-sensitive, kept as-is
+
+# Run with migrated secrets
+coffer run --global --ns=prod python app.py
+```
 
 ### PostgreSQL Database Proxy
 
