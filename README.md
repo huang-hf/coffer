@@ -92,6 +92,38 @@ coffer --help
 
 ---
 
+## Upgrading
+
+### Upgrade the coffer binary
+
+```bash
+# Option A: go install (requires Go)
+go install github.com/huang-hf/coffer/cmd/coffer@latest
+
+# Option B: build from source
+git pull
+go build -o ~/bin/coffer ./cmd/coffer
+```
+
+If you have an old coffer in `~/bin/coffer` but `go install` puts it in `~/go/bin/coffer`, make sure your `PATH` picks up the right one. Add this to `~/.zshrc`:
+
+```bash
+export PATH="$HOME/go/bin:$PATH"
+```
+
+### Update the AI agent skill
+
+After upgrading the binary, update the installed skill (the SKILL.md that tells your AI agent how to use coffer):
+
+```bash
+coffer install-claude-code   # for Claude Code
+coffer install-codex         # for Codex
+```
+
+Restart your agent session to pick up the updated skill.
+
+---
+
 ## Tutorial
 
 ### Build and Install
@@ -260,14 +292,32 @@ coffer migrate .env --global --ns=prod              # Execute
 
 ## Skill Installation
 
-Coffer includes a built-in SKILL.md for AI agents. Install it with:
+Coffer includes a built-in SKILL.md for AI agents. The skill tells agents how to use coffer (available commands, architecture, agent rules).
+
+### First install
 
 ```bash
 coffer install-claude-code   # for Claude Code
 coffer install-codex         # for Codex
 ```
 
-The commands are idempotent — run them again to update the installed skill to the latest version bundled with your coffer binary.
+### Update
+
+The skill is embedded at compile time. To update it after modifying `internal/skill/SKILL.md`:
+
+```bash
+# 1. Rebuild coffer so the new skill is embedded
+go build -o ~/bin/coffer ./cmd/coffer
+
+# 2. Install the updated skill
+coffer install-claude-code
+# ✓ coffer skill installed for claude-code
+#   Restart your agent to pick up the new skill.
+```
+
+The commands are idempotent — running them again always overwrites the installed skill with the version embedded in the binary.
+
+Restart your agent session to pick up the updated skill.
 
 ---
 

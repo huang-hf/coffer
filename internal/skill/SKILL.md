@@ -14,7 +14,9 @@ triggers:
 
 # Coffer - Secure Secret Management for Agents
 
-Coffer stores secrets in the OS credential store and injects them into commands, templates, or local database proxies. It is designed for agent workflows where raw credentials should not be printed, written into project files, or exposed unnecessarily.
+Coffer stores secrets in `~/.coffer/` as owner-only-readable files (0600). Secrets are encrypted at rest with age (X25519) automatically when the age key exists. System keychain backends (macOS Keychain, Linux secret-tool, Windows Credential Manager) are available as opt-in.
+
+Secrets are injected into commands via environment variables, file templates, or local database proxies. No plaintext secrets in project files, `.env`, or git history.
 
 ## Agent Rules
 
@@ -25,17 +27,29 @@ Coffer stores secrets in the OS credential store and injects them into commands,
 5. Prefer `coffer inject` for rendering config templates.
 6. Use `--global --ns=<namespace>` for shared machine/user secrets and environment-specific namespaces.
 7. Environment injection preserves the exact secret name. Name secrets exactly as the target tool expects, such as `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, or `db_password`.
+8. Secrets are always stored in `~/.coffer/` (the store directory), regardless of `--global` flag.
+
+## Architecture
+
+| Component | Path | Description |
+|-----------|------|-------------|
+| Secret store | `~/.coffer/` | Age-encrypted `.json.age` files (or plain `.json` fallback) |
+| Age encryption key | `~/.coffer/key` | Auto-generated on `coffer init` |
+| Global config | `~/.config/coffer/config.yaml` | Created by `coffer init --global` |
+| Local config | `./.coffer` | Created by `coffer init` |
+
+Age encryption is transparent: if `~/.coffer/key` exists, `secret add` writes encrypted files and `secret get/list/run` decrypts on read. Plain `.json` secrets from before the encryption migration are still readable via fallback.
 
 ## Config Levels
 
-Two levels are supported:
+Two levels are supported, merged at runtime (global base + local overrides):
 
 | Level | Path | Initialize |
 | --- | --- | --- |
 | Global | `~/.config/coffer/config.yaml` | `coffer init --global` |
 | Local | `./.coffer` | `coffer init` |
 
-Default behavior merges global and local config: global secrets/databases are the base, local entries override or add to them. Use `--global` to operate on the global config only.
+Use `--global` to operate on the global config only. Without it, local `.coffer` takes priority.
 
 Namespace priority: CLI `--ns` > `COFFER_NS` environment variable > config `default_ns`.
 
@@ -44,8 +58,8 @@ Namespace priority: CLI `--ns` > `COFFER_NS` environment variable > config `defa
 ### Initialize
 
 ```bash
-coffer init
-coffer init --global
+coffer init            # local config (.coffer) + age key (~/.coffer/key)
+coffer init --global   # global config (~/.config/coffer/config.yaml) + age key
 ```
 
 ### Manage Secrets
@@ -57,6 +71,8 @@ coffer secret list [--ns=<namespace>] [--global]
 coffer secret delete <name> [--ns=<namespace>] [--global]
 coffer secret get <name> [--ns=<namespace>] [--global]
 ```
+
+Secrets are always stored in `~/.coffer/` even when `--global` is not set — the flag only determines which config file to use.
 
 `secret add` and `secret update` prompt interactively. Non-interactive stdin is supported:
 
@@ -92,7 +108,7 @@ If the secret is named `db_password`, the child process receives `db_password`. 
 
 ### Inject Templates
 
-Render `{{coffer:name}}` placeholders from keychain values:
+Render `{{coffer:name}}` placeholders from stored secrets:
 
 ```bash
 coffer inject -i config.tmpl -o config.yaml [--global] [--ns=<namespace>]
@@ -107,7 +123,7 @@ Use this when a tool needs a config file rather than environment variables.
 coffer migrate <env-file> [--global] [--ns=<namespace>] [--inject=env|file] [--template=<path>] [--dry-run] [--force]
 ```
 
-Migrate sensitive keys from `.env` into the keychain and generate a template with `{{coffer:name}}` placeholders.
+Migrate sensitive keys from `.env` into the store and generate a template with `{{coffer:name}}` placeholders.
 
 ### PostgreSQL Database Proxy
 
@@ -123,7 +139,7 @@ Start a local proxy:
 coffer db proxy my-pg [--global]
 ```
 
-The proxy listens on `127.0.0.1:<port>`, authenticates to the real PostgreSQL server using the keychain password, then relays traffic. Client tools connect to the local proxy without needing the database password.
+The proxy listens on `127.0.0.1:<port>`, authenticates to the real PostgreSQL server using the stored password, then relays traffic. Client tools connect to the local proxy without needing the database password.
 
 ## Common Agent Workflows
 
@@ -165,31 +181,59 @@ coffer run --global --ns=aws-dev aws ecr get-login-password --region ap-northeas
 
 ### Render Temporary AWS Credentials File
 
-Use only when a tool requires `~/.aws/credentials`:
-
-```ini
-[default]
-aws_access_key_id = {{coffer:AWS_ACCESS_KEY_ID}}
-aws_secret_access_key = {{coffer:AWS_SECRET_ACCESS_KEY}}
-```
+For tools that insist on reading credentials from a file:
 
 ```bash
-coffer inject -i credentials.tmpl -o ~/.aws/credentials --global --ns=aws-dev
+coffer run --global --ns=aws-dev --inject=file -- aws sts get-caller-identity
 ```
 
-Remove generated credential files when no longer needed.
+### Database Proxy Workflow
 
-## Installing This Skill
+```bash
+# Register
+coffer db add my-pg --host db.example.com --port 5432 --user admin --database app --global
+
+# Proxy (background)
+coffer db proxy my-pg --global &
+
+# Connect
+psql -h 127.0.0.1 -p 5432 -U admin -d app
+```
+
+## System Keychain Opt-in
+
+By default, coffer uses `~/.coffer/` file store. To use system keychain instead, set:
+
+| Backend | Env var | Platform |
+|---------|---------|----------|
+| macOS Keychain | `COFFER_USE_KEYCHAIN=true` | macOS |
+| Linux secret-tool | `COFFER_USE_SECRET_TOOL=true` | Linux |
+| Windows Credential Manager | `COFFER_USE_CMDKEY=true` | Windows |
+
+No additional dependencies required for the default file store on any platform.
+
+## Upgrading
+
+### Upgrade the coffer binary
+
+```bash
+# Option A: go install (requires Go)
+go install github.com/huang-hf/coffer/cmd/coffer@latest
+
+# Option B: build from source
+git pull
+go build -o ~/bin/coffer ./cmd/coffer
+```
+
+If you have an old coffer in `~/bin/coffer` but `go install` puts it in `~/go/bin/coffer`, make sure `PATH` picks up the right one.
+
+### Update this skill
+
+After upgrading the binary, update the installed skill:
 
 ```bash
 coffer install-claude-code   # for Claude Code
 coffer install-codex         # for Codex
 ```
 
-These commands are embedded in the coffer binary. Running them again overwrites the skill with the latest version.
-
-## Platform Support
-
-- macOS: Keychain via `security`
-- Linux: GNOME Keyring via `secret-tool`
-- Windows: Credential Manager via `cmdkey`
+Restart your agent session to pick up the updated skill.
