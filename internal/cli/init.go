@@ -51,8 +51,9 @@ func runInit(args []string, stdout io.Writer, stderr io.Writer, opts *Options) i
 	fmt.Fprintln(stdout, "✓ Created .coffer")
 	fmt.Fprintln(stdout)
 	fmt.Fprintln(stdout, "Next steps:")
-	fmt.Fprintln(stdout, "  1. Add secrets: coffer secret add <name> --ns=<namespace>")
-	fmt.Fprintln(stdout, "  2. Run your app: coffer run <command>")
+	fmt.Fprintln(stdout, "  1. Add secrets:   coffer secret add <name> --ns=<namespace>")
+	fmt.Fprintln(stdout, "  2. Import .env:   coffer migrate .env --ns=<namespace>")
+	fmt.Fprintln(stdout, "  3. Run your app:  coffer run <command>")
 	return 0
 }
 
@@ -92,8 +93,9 @@ func runInitGlobal(stdout io.Writer, stderr io.Writer) int {
 	fmt.Fprintf(stdout, "✓ Created global config at %s\n", globalPath)
 	fmt.Fprintln(stdout)
 	fmt.Fprintln(stdout, "Next steps:")
-	fmt.Fprintln(stdout, "  1. Add global secrets: coffer secret add --global <name>")
-	fmt.Fprintln(stdout, "  2. Use in any project: coffer run <command>")
+	fmt.Fprintln(stdout, "  1. Add secrets:   coffer secret add --global <name> --ns=<namespace>")
+	fmt.Fprintln(stdout, "  2. Import .env:   coffer migrate .env --global --ns=<namespace>")
+	fmt.Fprintln(stdout, "  3. Run your app:  coffer run --global --ns=<namespace> <command>")
 	return 0
 }
 

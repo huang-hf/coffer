@@ -122,11 +122,14 @@ func runStatus(args []string, stdout io.Writer, stderr io.Writer, opts *Options)
 	}
 	fmt.Fprintln(stdout)
 
+	totalSecrets := 0
+
 	defaultSecrets, err := store.List(cfg.DefaultNS)
 	if err != nil {
 		fmt.Fprintf(stderr, "Error listing secrets for default namespace: %v\n", err)
 	} else {
 		fmt.Fprintf(stdout, "Namespace '%s': %d secrets\n", cfg.DefaultNS, len(defaultSecrets))
+		totalSecrets += len(defaultSecrets)
 	}
 
 	for ns := range cfg.Namespaces {
@@ -136,6 +139,13 @@ func runStatus(args []string, stdout io.Writer, stderr io.Writer, opts *Options)
 			continue
 		}
 		fmt.Fprintf(stdout, "Namespace '%s': %d secrets\n", ns, len(secrets))
+		totalSecrets += len(secrets)
+	}
+
+	if totalSecrets == 0 {
+		fmt.Fprintln(stdout)
+		fmt.Fprintln(stdout, "💡 Tip: have an existing .env file? Import it with:")
+		fmt.Fprintln(stdout, "     coffer migrate .env --global --ns=<namespace>")
 	}
 
 	return 0
