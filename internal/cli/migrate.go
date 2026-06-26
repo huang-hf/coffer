@@ -189,26 +189,6 @@ func runMigrate(args []string, stdout io.Writer, stderr io.Writer, opts *Options
 			fmt.Fprintf(stdout, "   ✓ %s\n", entry.key)
 		}
 
-		sensitiveSet := make(map[string]bool, len(sensitive))
-		for _, entry := range sensitive {
-			sensitiveSet[entry.key] = true
-		}
-
-		existing := cfg.GetSecretsForNamespace(ns)
-		var staleKeys []string
-		for key := range existing {
-			if !sensitiveSet[key] {
-				staleKeys = append(staleKeys, key)
-			}
-		}
-		if len(staleKeys) > 0 {
-			fmt.Fprintf(stdout, "\n🗑️  Removing stale secrets from config:\n")
-			for _, key := range staleKeys {
-				cfg.DeleteSecretForNamespace(ns, key)
-				fmt.Fprintf(stdout, "   ✗ %s\n", key)
-			}
-		}
-
 		for _, entry := range sensitive {
 			placeholder := fmt.Sprintf("{{coffer:%s}}", entry.key)
 			cfg.SetSecretForNamespace(ns, entry.key, placeholder)
