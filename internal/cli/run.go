@@ -54,8 +54,13 @@ func runRun(args []string, stdout io.Writer, stderr io.Writer, opts *Options) in
 	for secretName := range secrets {
 		value, err := store.Get(ns, secretName)
 		if err != nil {
+			scope := ""
+			if opts.Global {
+				scope = " --global"
+			}
 			fmt.Fprintf(stderr, "Error getting secret '%s': %v\n", secretName, err)
-			fmt.Fprintf(stderr, "  Fix: coffer secret add %s --ns=%s\n", secretName, ns)
+			fmt.Fprintf(stderr, "  Fix: coffer secret add%s %s --ns=%s\n", scope, secretName, ns)
+			fmt.Fprintf(stderr, "  Or remove it from config: coffer secret delete%s %s --ns=%s\n", scope, secretName, ns)
 			return 1
 		}
 

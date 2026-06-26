@@ -89,7 +89,7 @@ func runSecretAdd(args []string, stdout io.Writer, stderr io.Writer, opts *Optio
 		if opts.Global {
 			fmt.Fprintln(stderr, "Error: global config not found. Run 'coffer init --global' first")
 		} else {
-			fmt.Fprintln(stderr, "Error: not initialized. Run 'coffer init' first")
+			fmt.Fprintln(stderr, "Error: not initialized. Run 'coffer init' first or use --global")
 		}
 		return 1
 	}
@@ -156,7 +156,7 @@ func runSecretUpdate(args []string, stdout io.Writer, stderr io.Writer, opts *Op
 		if opts.Global {
 			fmt.Fprintln(stderr, "Error: global config not found. Run 'coffer init --global' first")
 		} else {
-			fmt.Fprintln(stderr, "Error: not initialized. Run 'coffer init' first")
+			fmt.Fprintln(stderr, "Error: not initialized. Run 'coffer init' first or use --global")
 		}
 		return 1
 	}
@@ -226,7 +226,7 @@ func runSecretList(args []string, stdout io.Writer, stderr io.Writer, opts *Opti
 	} else {
 		cfg, err = config.LoadChain(".coffer")
 		if err != nil {
-			fmt.Fprintln(stderr, "Error: not initialized. Run 'coffer init' first")
+			fmt.Fprintln(stderr, "Error: not initialized. Run 'coffer init' first or use --global")
 			return 1
 		}
 		// For listing, ResolveNamespace works on any config
@@ -281,7 +281,7 @@ func runSecretDelete(args []string, stdout io.Writer, stderr io.Writer, opts *Op
 		if opts.Global {
 			fmt.Fprintln(stderr, "Error: global config not found. Run 'coffer init --global' first")
 		} else {
-			fmt.Fprintln(stderr, "Error: not initialized. Run 'coffer init' first")
+			fmt.Fprintln(stderr, "Error: not initialized. Run 'coffer init' first or use --global")
 		}
 		return 1
 	}
@@ -352,7 +352,7 @@ func runSecretGet(args []string, stdout io.Writer, stderr io.Writer, opts *Optio
 		if opts.Global {
 			fmt.Fprintln(stderr, "Error: global config not found. Run 'coffer init --global' first")
 		} else {
-			fmt.Fprintln(stderr, "Error: not initialized. Run 'coffer init' first")
+			fmt.Fprintln(stderr, "Error: not initialized. Run 'coffer init' first or use --global")
 		}
 		return 1
 	}
