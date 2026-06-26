@@ -162,7 +162,7 @@ func (s *fileStore) Delete(namespace, name string) error {
 	}
 
 	if !removed {
-		return fmt.Errorf("secret not found")
+		return fmt.Errorf("secret '%s/%s' does not exist in the store", namespace, name)
 	}
 
 	return nil

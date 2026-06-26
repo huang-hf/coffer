@@ -55,6 +55,7 @@ func runRun(args []string, stdout io.Writer, stderr io.Writer, opts *Options) in
 		value, err := store.Get(ns, secretName)
 		if err != nil {
 			fmt.Fprintf(stderr, "Error getting secret '%s': %v\n", secretName, err)
+			fmt.Fprintf(stderr, "  Fix: coffer secret add %s --ns=%s\n", secretName, ns)
 			return 1
 		}
 

@@ -288,6 +288,18 @@ func runSecretDelete(args []string, stdout io.Writer, stderr io.Writer, opts *Op
 
 	ns := cfg.ResolveNamespace(opts.NS)
 
+	store, err := secret.NewStore()
+	if err != nil {
+		fmt.Fprintf(stderr, "Error creating secret store: %v\n", err)
+		return 1
+	}
+
+	// Check if secret exists before asking for confirmation
+	if _, err := store.Get(ns, name); err != nil {
+		fmt.Fprintf(stderr, "Error: secret '%s' does not exist in namespace '%s'\n", name, ns)
+		return 1
+	}
+
 	fmt.Fprintf(stdout, "Delete secret '%s' from namespace '%s'? (y/N): ", name, ns)
 	reader := bufio.NewReader(os.Stdin)
 	confirm, _ := reader.ReadString('\n')
@@ -295,12 +307,6 @@ func runSecretDelete(args []string, stdout io.Writer, stderr io.Writer, opts *Op
 	if confirm != "y" && confirm != "Y" {
 		fmt.Fprintln(stdout, "Cancelled")
 		return 0
-	}
-
-	store, err := secret.NewStore()
-	if err != nil {
-		fmt.Fprintf(stderr, "Error creating secret store: %v\n", err)
-		return 1
 	}
 
 	if err := store.Delete(ns, name); err != nil {
