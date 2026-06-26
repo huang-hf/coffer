@@ -268,21 +268,18 @@ coffer install-codex         # for Codex
 
 ### Update
 
-The skill is embedded at compile time. To update it after modifying `internal/skill/SKILL.md`:
+The skill is bundled inside the coffer binary. To get the latest version:
 
 ```bash
-# 1. Rebuild coffer so the new skill is embedded
-go build -o ~/bin/coffer ./cmd/coffer
+# 1. Upgrade coffer to the latest version
+go install github.com/huang-hf/coffer/cmd/coffer@latest
 
-# 2. Install the updated skill
-coffer install-claude-code
-# ✓ coffer skill installed for claude-code
-#   Restart your agent to pick up the new skill.
+# 2. Install/update the skill for your agent
+coffer install-claude-code   # for Claude Code
+coffer install-codex         # for Codex
 ```
 
-The commands are idempotent — running them again always overwrites the installed skill with the version embedded in the binary.
-
-Restart your agent session to pick up the updated skill.
+The commands are idempotent — running them again always overwrites the installed skill with the version embedded in the binary. Restart your agent session to pick up the updated skill.
 
 ---
 
