@@ -288,19 +288,20 @@ func runSecretDelete(args []string, stdout io.Writer, stderr io.Writer, opts *Op
 
 	ns := cfg.ResolveNamespace(opts.NS)
 
-	store, err := secret.NewStore()
-	if err != nil {
-		fmt.Fprintf(stderr, "Error creating secret store: %v\n", err)
+	// Check if secret exists in config
+	secretExistsInConfig := false
+	for s := range cfg.GetSecretsForNamespace(ns) {
+		if s == name {
+			secretExistsInConfig = true
+			break
+		}
+	}
+	if !secretExistsInConfig {
+		fmt.Fprintf(stderr, "Error: secret '%s' not found in namespace '%s' config\n", name, ns)
 		return 1
 	}
 
-	// Check if secret exists before asking for confirmation
-	if _, err := store.Get(ns, name); err != nil {
-		fmt.Fprintf(stderr, "Error: secret '%s' does not exist in namespace '%s'\n", name, ns)
-		return 1
-	}
-
-	fmt.Fprintf(stdout, "Delete secret '%s' from namespace '%s'? (y/N): ", name, ns)
+	fmt.Fprintf(stdout, "Remove secret '%s' from namespace '%s'? (y/N): ", name, ns)
 	reader := bufio.NewReader(os.Stdin)
 	confirm, _ := reader.ReadString('\n')
 	confirm = strings.TrimSpace(confirm)
@@ -309,21 +310,25 @@ func runSecretDelete(args []string, stdout io.Writer, stderr io.Writer, opts *Op
 		return 0
 	}
 
-	if err := store.Delete(ns, name); err != nil {
-		fmt.Fprintf(stderr, "Error deleting secret: %v\n", err)
+	cfg.DeleteSecretForNamespace(ns, name)
+	if err := config.Save(cfg, cfgPath); err != nil {
+		fmt.Fprintf(stderr, "Error updating config: %v\n", err)
 		return 1
 	}
 
-	cfg.DeleteSecretForNamespace(ns, name)
-	if err := config.Save(cfg, cfgPath); err != nil {
-		fmt.Fprintf(stderr, "Warning: secret deleted from keychain but failed to update config: %v\n", err)
+	// Try to delete from store, but don't fail if already gone
+	store, err := secret.NewStore()
+	if err == nil {
+		if err := store.Delete(ns, name); err != nil {
+			fmt.Fprintf(stderr, "⚠  Secret not found in store (already deleted or never added)\n")
+		}
 	}
 
 	scope := "local"
 	if opts.Global {
 		scope = "global"
 	}
-	fmt.Fprintf(stdout, "✓ Secret '%s' deleted from %s namespace '%s'\n", name, scope, ns)
+	fmt.Fprintf(stdout, "✓ Secret '%s' removed from %s namespace '%s'\n", name, scope, ns)
 	return 0
 }
 
