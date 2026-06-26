@@ -35,53 +35,34 @@ coffer secret add AWS_SECRET_ACCESS_KEY --global --ns=aws
 
 ## Installation
 
-### Prerequisites
+Coffer has no runtime dependencies. Binary only — download or build one.
 
-None. Coffer uses a file-based store by default (`~/.coffer/`, 0600 permissions). System keyring backends are opt-in only.
-
-| Opt-in backend | Env var | Platform |
-|---------------|---------|----------|
-| macOS Keychain | `COFFER_USE_KEYCHAIN=true` | macOS |
-| Linux GNOME Keyring | `COFFER_USE_SECRET_TOOL=true` | Linux |
-| Windows Credential Manager | `COFFER_USE_CMDKEY=true` | Windows |
-
-### Option A: Cross-compile and deploy (recommended for servers)
-
-Build a Linux binary on your development machine and copy it to the server:
-
-```bash
-git clone <repo-url>
-cd coffer
-
-GOOS=linux GOARCH=amd64 go build -o coffer-linux ./cmd/coffer
-
-scp coffer-linux user@your-server:/tmp/coffer
-
-ssh user@your-server
-sudo mv /tmp/coffer /usr/local/bin/coffer
-sudo chmod +x /usr/local/bin/coffer
-```
-
-> For ARM servers (AWS Graviton, Raspberry Pi), use `GOARCH=arm64`.
-
-### Option B: Build directly on the server
-
-If Go ≥ 1.25 is already installed:
-
-```bash
-git clone <repo-url>
-cd coffer
-go build -o coffer ./cmd/coffer
-sudo mv coffer /usr/local/bin/
-```
-
-### Option C: `go install`
+### macOS / Linux workstation
 
 ```bash
 go install github.com/huang-hf/coffer/cmd/coffer@latest
 ```
 
-`coffer` will be placed in `$GOPATH/bin`.
+Make sure `$GOPATH/bin` (default `~/go/bin`) is in your `PATH`:
+
+```bash
+export PATH="$HOME/go/bin:$PATH"
+# add to ~/.zshrc or ~/.bashrc to persist
+```
+
+### Linux server (no Go toolchain)
+
+Build on your workstation and copy:
+
+```bash
+git clone <repo-url> && cd coffer
+GOOS=linux GOARCH=amd64 go build -o coffer-linux ./cmd/coffer
+scp coffer-linux user@server:/tmp/coffer
+ssh user@server
+sudo mv /tmp/coffer /usr/local/bin/coffer && sudo chmod +x /usr/local/bin/coffer
+```
+
+> For ARM servers (AWS Graviton, Raspberry Pi), use `GOARCH=arm64`.
 
 ### Verify
 
@@ -125,22 +106,6 @@ Restart your agent session to pick up the updated skill.
 ---
 
 ## Tutorial
-
-### Build and Install
-
-```bash
-git clone <repo-url>
-cd coffer
-go build -o coffer ./cmd/coffer
-
-mkdir -p ~/bin
-cp coffer ~/bin/
-chmod +x ~/bin/coffer
-echo 'export PATH="$HOME/bin:$PATH"' >> ~/.zshrc
-source ~/.zshrc
-
-coffer --version
-```
 
 ### Project Setup
 
