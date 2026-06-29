@@ -72,8 +72,10 @@ func parseGlobalFlags(args *[]string) (*Options, error) {
 	for i := 0; i < len(*args); i++ {
 		arg := (*args)[i]
 
-		// -- terminates option parsing; everything after is positional
+		// -- terminates option parsing; everything after is positional.
+		// Preserve -- itself so subcommands like kubectl exec pod -- cmd work.
 		if arg == "--" {
+			remaining = append(remaining, arg)
 			remaining = append(remaining, (*args)[i+1:]...)
 			break
 		}
