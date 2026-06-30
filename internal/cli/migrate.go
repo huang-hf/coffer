@@ -242,10 +242,10 @@ func printMigrateUsage(w io.Writer) {
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, "Options:")
 	fmt.Fprintln(w, "  --template=<path>    Target template file (default: .env.template)")
-	fmt.Fprintln(w, "  --ns=<name>          Target namespace")
+	fmt.Fprintln(w, "  -n, --ns=<name>      Target namespace")
 	fmt.Fprintln(w, "  --namespace=<name>   Target namespace (legacy alias)")
 	fmt.Fprintln(w, "  --inject=<mode>      Injection mode: env or file")
-	fmt.Fprintln(w, "  --global             Migrate into global config")
+	fmt.Fprintln(w, "  -g, --global         Migrate into global config")
 	fmt.Fprintln(w, "  --dry-run            Only generate template, don't store secrets")
 	fmt.Fprintln(w, "  --force              Skip confirmation")
 }

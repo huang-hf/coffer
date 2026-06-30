@@ -52,9 +52,9 @@ func printSecretUsage(w io.Writer) {
 	fmt.Fprintln(w, "  get <name>       Print a secret value")
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, "Options:")
-	fmt.Fprintln(w, "  --ns=<namespace> Specify namespace")
-	fmt.Fprintln(w, "  --global         Use global config")
-	fmt.Fprintln(w, "  --json           JSON output where supported")
+	fmt.Fprintln(w, "  -n, --ns=<namespace> Specify namespace")
+	fmt.Fprintln(w, "  -g, --global         Use global config")
+	fmt.Fprintln(w, "  --json               JSON output where supported")
 }
 
 // configPath returns the config file path based on global flag

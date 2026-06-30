@@ -99,7 +99,7 @@ func printRunUsage(w io.Writer) {
 	fmt.Fprintln(w, "Usage: coffer run <command> [args...]")
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, "Options:")
-	fmt.Fprintln(w, "  --ns=<namespace> Specify namespace")
-	fmt.Fprintln(w, "  --global         Use global config")
-	fmt.Fprintln(w, "  --inject=<mode>  Injection mode: env or file")
+	fmt.Fprintln(w, "  -n, --ns=<namespace> Specify namespace")
+	fmt.Fprintln(w, "  -g, --global         Use global config")
+	fmt.Fprintln(w, "  --inject=<mode>      Injection mode: env or file")
 }

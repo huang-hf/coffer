@@ -81,9 +81,9 @@ func parseGlobalFlags(args *[]string) (*Options, error) {
 		}
 
 		switch {
-		case strings.HasPrefix(arg, "--ns="):
-			opts.NS = strings.TrimPrefix(arg, "--ns=")
-		case arg == "--ns" && i+1 < len(*args):
+		case strings.HasPrefix(arg, "--ns=") || strings.HasPrefix(arg, "-n="):
+			opts.NS = strings.TrimPrefix(strings.TrimPrefix(arg, "--ns="), "-n=")
+		case (arg == "--ns" || arg == "-n") && i+1 < len(*args):
 			i++
 			opts.NS = (*args)[i]
 		case arg == "--json":
@@ -98,7 +98,7 @@ func parseGlobalFlags(args *[]string) (*Options, error) {
 		case arg == "--config" && i+1 < len(*args):
 			i++
 			opts.Config = (*args)[i]
-		case arg == "--global":
+		case arg == "--global" || arg == "-g":
 			opts.Global = true
 		default:
 			remaining = append(remaining, arg)
@@ -136,13 +136,13 @@ func printUsage(w io.Writer) {
 	fmt.Fprintln(w, "  install-codex       Install/update Codex skill")
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, "Global Options:")
-	fmt.Fprintln(w, "  --ns=<namespace>    Specify namespace (default: 'default')")
-	fmt.Fprintln(w, "  --json              Output JSON (for agent)")
-	fmt.Fprintln(w, "  --inject=<mode>     Injection mode: env or file (default: env)")
-	fmt.Fprintln(w, "  --config=<path>     Config file path")
-	fmt.Fprintln(w, "  --global            Use global config instead of local .coffer")
-	fmt.Fprintln(w, "  -h, --help          Show this help")
-	fmt.Fprintln(w, "  -v, --version       Show version")
+	fmt.Fprintln(w, "  -n, --ns=<namespace> Specify namespace (default: 'default')")
+	fmt.Fprintln(w, "  -g, --global         Use global config instead of local .coffer")
+	fmt.Fprintln(w, "  --json               Output JSON (for agent)")
+	fmt.Fprintln(w, "  --inject=<mode>      Injection mode: env or file (default: env)")
+	fmt.Fprintln(w, "  --config=<path>      Config file path")
+	fmt.Fprintln(w, "  -h, --help           Show this help")
+	fmt.Fprintln(w, "  -v, --version        Show version")
 }
 
 func writeJSON(w io.Writer, data interface{}) error {
