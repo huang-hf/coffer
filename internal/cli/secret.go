@@ -45,7 +45,7 @@ func printSecretUsage(w io.Writer) {
 	fmt.Fprintln(w, "Usage: coffer secret <add|update|list|delete|get> [name]")
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, "Commands:")
-	fmt.Fprintln(w, "  add <name>       Add a secret")
+	fmt.Fprintln(w, "  add <name>...    Add a secret (--ui: set in browser)")
 	fmt.Fprintln(w, "  update <name>    Update a secret")
 	fmt.Fprintln(w, "  list             List configured secrets")
 	fmt.Fprintln(w, "  delete <name>    Delete a secret")
@@ -67,20 +67,23 @@ func configPath(opts *Options) string {
 
 func runSecretAdd(args []string, stdout io.Writer, stderr io.Writer, opts *Options) int {
 	if isHelp(args) {
-		fmt.Fprintln(stdout, "Usage: coffer secret add <name> [--ns=<namespace>] [--global]")
+		fmt.Fprintln(stdout, secretAddUsage)
 		return 0
 	}
-	if len(args) != 1 {
-		fmt.Fprintln(stderr, "Usage: coffer secret add <name> [--ns=<namespace>] [--global]")
+	if len(args) == 0 {
+		fmt.Fprintln(stderr, secretAddUsage)
 		return 1
 	}
 
-	name := args[0]
-	if !isValidSecretName(name) {
-		fmt.Fprintf(stderr, "Error: invalid secret name '%s'\n", name)
-		fmt.Fprintln(stderr, "Secret names must contain only letters, numbers, hyphens, and underscores")
+	parsed, err := parseSecretAddArgs(args)
+	if err != nil {
+		fmt.Fprintf(stderr, "Error: %v\n", err)
 		return 1
 	}
+	if parsed.UI {
+		return runSecretAddUI(parsed, stdout, stderr, opts)
+	}
+	name := parsed.Names[0]
 
 	cfgPath := configPath(opts)
 
