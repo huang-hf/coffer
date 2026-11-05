@@ -25,6 +25,8 @@ import (
 //go:embed assets/index.html assets/app.js assets/app.css
 var assets embed.FS
 
+const errWithheld = "save failed (error message withheld because it contained the secret value)"
+
 const (
 	maxBodyBytes = 64 * 1024
 	csp          = "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
@@ -373,7 +375,10 @@ func (s *server) handleSave(w http.ResponseWriter, r *http.Request) {
 		warning, err := s.req.Save(it.name, it.value)
 		res := Result{Name: it.name, Saved: err == nil, Warning: warning}
 		if err != nil {
-			res.Error = strings.ReplaceAll(err.Error(), string(it.value), "***")
+			res.Error = err.Error()
+			if strings.Contains(res.Error, string(it.value)) {
+				res.Error = errWithheld
+			}
 			allOK = false
 		}
 		s.results[it.name] = res

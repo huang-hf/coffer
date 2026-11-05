@@ -568,3 +568,21 @@ func TestSaveErrorContainingValueIsRedacted(t *testing.T) {
 		}
 	}
 }
+
+func TestSaveErrorContainingValueIsWithheldWholesale(t *testing.T) {
+	const withheld = "save failed (error message withheld because it contained the secret value)"
+	req := baseReq(newFakeSave(), "A")
+	req.Save = func(name string, value []byte) (string, error) {
+		return "", errors.New("store boom")
+	}
+	req.Timeout = 300 * time.Millisecond
+	e := startRun(t, req)
+	_, body := e.save(t, "A", "boom")
+	if strings.Contains(body, "boom") || strings.Contains(body, "***") || !strings.Contains(body, withheld) {
+		t.Fatalf("response: %s", body)
+	}
+	out := e.wait(t)
+	if len(out.Results) != 1 || out.Results[0].Error != withheld {
+		t.Fatalf("outcome %+v", out)
+	}
+}
