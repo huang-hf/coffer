@@ -130,12 +130,12 @@ coffer secret add api-key
 coffer secret add DB_PASSWORD API_KEY --ui --desc "DB_PASSWORD=Production database" --global --ns=prod
 ```
 
-Coffer starts a temporary server on `127.0.0.1` (random port, one-time token) and opens a settings page in your browser. Enter the values, then submit. The command blocks until you save or cancel, or until `--timeout` (default 5m) expires, and exits 0 only if the secrets were saved.
+Coffer starts a temporary server on `127.0.0.1` (random port, per-session random token) and opens a settings page in your browser. Enter the values, then submit. The command blocks until you save or cancel, or until `--timeout` (default 5m) expires, and exits 0 only if the secrets were saved.
 
 - Values travel only from your local browser to the coffer process, which writes them to the secret store.
 - The page never displays any secret value; existing secrets are shown only as set/missing with their last update time.
 - Deletion is not supported on this page; use `coffer secret delete`.
-- Nothing is printed to the terminal except the per-name result.
+- No secret value is ever printed to the terminal; only the local URL and per-name results are shown.
 
 ### Run a Command
 

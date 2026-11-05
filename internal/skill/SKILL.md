@@ -195,9 +195,9 @@ coffer secret add <NAME> [<NAME2>] --ui --desc "<NAME>=<purpose>" -g -n <ns>
 
 Rules:
 
-- The command blocks until the user submits or cancels, for at most `--timeout` (default 5m). When calling it through the Bash tool in Claude Code, set the tool `timeout` to `360000` (longer than 5 minutes).
+- The command blocks until the user submits or cancels, for at most `--timeout` (default 5m). When calling it through the Bash tool in Claude Code, set the tool `timeout` to `360000` (longer than 5 minutes). If you pass a larger `--timeout`, set the tool `timeout` above it (max `600000`).
 - Only exit code 0 means success. Report the result for every name in the output to the user, including other secrets they updated on the same page.
-- On timeout or cancel (exit code 1, `Error: timed out after ...` / `Error: cancelled by user`), tell the user nothing was set and ask what to do next. Do not retry automatically, and never ask the user to paste the value into chat.
+- On timeout or cancel (exit code 1, `Error: timed out after ...` / `Error: cancelled by user`), tell the user the operation did not complete: any name marked ✓ in the output was saved, all others were not. Ask what to do next. Do not retry automatically, and never ask the user to paste the value into chat.
 - Do not read or print any secret value beyond the command output, and do not use `secret get`.
 
 ### AWS / ECR Without `~/.aws/credentials`
