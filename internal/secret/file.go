@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
 	"filippo.io/age"
 )
@@ -198,4 +199,22 @@ func (s *fileStore) List(namespace string) ([]string, error) {
 	}
 	sort.Strings(names)
 	return names, nil
+}
+
+func (s *fileStore) backendKind() BackendKind {
+	if s.isEncrypted() {
+		return BackendFileEncrypted
+	}
+	return BackendFilePlain
+}
+
+// modTime stats the encrypted file first, then the plaintext one.
+func (s *fileStore) modTime(namespace, name string) (time.Time, bool) {
+	plainPath, encPath := s.getPaths(namespace, name)
+	for _, p := range []string{encPath, plainPath} {
+		if fi, err := os.Stat(p); err == nil {
+			return fi.ModTime(), true
+		}
+	}
+	return time.Time{}, false
 }

@@ -117,3 +117,7 @@ func (k *KeychainStore) List(namespace string) ([]string, error) {
 
 	return secrets, nil
 }
+
+func (k *KeychainStore) backendKind() BackendKind {
+	return BackendOSKeychain
+}

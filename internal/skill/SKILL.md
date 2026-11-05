@@ -22,7 +22,7 @@ Secrets are injected into commands via environment variables, file templates, or
 
 1. Prefer `coffer check --json` or `coffer secret list` to inspect readiness.
 2. Do not use `coffer secret get` unless the user explicitly asks to reveal a value.
-3. When a secret is missing, ask the user to run `coffer secret add <name>` rather than asking them to paste the value into chat.
+3. When a secret is missing or the user wants to update one, use `coffer secret add <NAME> --ui` (see "Set Secrets via Browser"). Never ask the user to paste a value into chat.
 4. Prefer `coffer run` for commands that need credentials.
 5. Prefer `coffer inject` for rendering config templates.
 6. Use `--global --ns=<namespace>` for shared machine/user secrets and environment-specific namespaces.
@@ -66,6 +66,7 @@ coffer init --global   # global config (~/.config/coffer/config.yaml) + age key
 
 ```bash
 coffer secret add <name> [--ns=<namespace>] [--global]
+coffer secret add <name>... --ui [--desc NAME=text]... [--timeout 5m] [--ns=<namespace>] [--global]
 coffer secret update <name> [--ns=<namespace>] [--global]
 coffer secret list [--ns=<namespace>] [--global]
 coffer secret delete <name> [--ns=<namespace>] [--global]
@@ -173,13 +174,31 @@ The proxy listens on `127.0.0.1:<port>`, authenticates to the real PostgreSQL se
 coffer check --global --ns=dev --json
 ```
 
-If missing, tell the user:
+If missing, tell the user a browser page will open, then run:
 
 ```bash
-coffer secret add SECRET_NAME --global --ns=dev
+coffer secret add SECRET_NAME --ui --desc "SECRET_NAME=<purpose>" --global --ns=dev
 ```
 
 Do not ask the user to paste the value into chat.
+
+### Set Secrets via Browser
+
+When a secret is missing, or the user wants to update one, let the user enter the value in a local browser page. The value goes straight from the browser to the coffer process on 127.0.0.1; it never appears in chat, the terminal, or command output.
+
+1. Tell the user in one sentence that a browser settings page will open.
+2. Run:
+
+```bash
+coffer secret add <NAME> [<NAME2>] --ui --desc "<NAME>=<purpose>" -g -n <ns>
+```
+
+Rules:
+
+- The command blocks until the user submits or cancels, for at most `--timeout` (default 5m). When calling it through the Bash tool in Claude Code, set the tool `timeout` to `360000` (longer than 5 minutes). If you pass a larger `--timeout`, set the tool `timeout` above it (max `600000`).
+- Only exit code 0 means success. Report the result for every name in the output to the user, including other secrets they updated on the same page.
+- On timeout or cancel (exit code 1, `Error: timed out after ...` / `Error: cancelled by user`), tell the user the operation did not complete: any name marked ✓ in the output was saved, all others were not. Ask what to do next. Do not retry automatically, and never ask the user to paste the value into chat.
+- Do not read or print any secret value beyond the command output, and do not use `secret get`.
 
 ### AWS / ECR Without `~/.aws/credentials`
 

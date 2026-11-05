@@ -118,7 +118,7 @@ func printUsage(w io.Writer) {
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, "Commands:")
 	fmt.Fprintln(w, "  init                Initialize project")
-	fmt.Fprintln(w, "  secret add <name>   Add a secret")
+	fmt.Fprintln(w, "  secret add <name>   Add a secret [--ui]")
 	fmt.Fprintln(w, "  secret update <name> Update a secret")
 	fmt.Fprintln(w, "  secret list         List secrets")
 	fmt.Fprintln(w, "  secret delete <name> Delete a secret")

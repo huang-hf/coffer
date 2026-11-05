@@ -124,6 +124,19 @@ coffer secret add api-key
 # Enter: myapikey123
 ```
 
+### Set secrets in the browser
+
+```bash
+coffer secret add DB_PASSWORD API_KEY --ui --desc "DB_PASSWORD=Production database" --global --ns=prod
+```
+
+Coffer starts a temporary server on `127.0.0.1` (random port, per-session random token) and opens a settings page in your browser. Enter the values, then submit. The command blocks until you save or cancel, or until `--timeout` (default 5m) expires, and exits 0 only if the secrets were saved.
+
+- Values travel only from your local browser to the coffer process, which writes them to the secret store.
+- The page never displays any secret value; existing secrets are shown only as set/missing with their last update time.
+- Deletion is not supported on this page; use `coffer secret delete`.
+- No secret value is ever printed to the terminal; only the local URL and per-name results are shown.
+
 ### Run a Command
 
 ```bash
@@ -185,6 +198,7 @@ Priority: `--ns` flag > `COFFER_NS` env var > config `default_ns`.
 |---------|-------------|
 | `coffer init [--global]` | Initialize config (local or global) |
 | `coffer secret add <name>` | Add a secret (interactive or stdin) |
+| `coffer secret add <name>... --ui` | Set one or more secrets in a local browser page (`--desc NAME=text`, `--timeout 5m`) |
 | `coffer secret update <name>` | Update an existing secret |
 | `coffer secret list` | List secrets in the current namespace |
 | `coffer secret get <name>` | Display a secret value (terminal only) |
