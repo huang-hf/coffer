@@ -222,7 +222,12 @@
     if (busy) return;
     busy = true;
     api('POST', '/api/cancel', {})
-      .then(function () { finalPage('已取消，可以关闭此页'); })
+      .then(function (r) {
+        if (r.status === 200) { finalPage('已取消，可以关闭此页'); return; }
+        busy = false;
+        banner = '取消失败：HTTP ' + r.status;
+        render();
+      })
       .catch(networkDown);
   }
 
@@ -230,6 +235,10 @@
     .then(function (r) {
       if (r.status !== 200) { banner = '无法加载页面（HTTP ' + r.status + '）'; app.textContent = banner; return; }
       st = r.body;
+      // Required names no longer pending were already saved (e.g. page reload).
+      var pend = {};
+      (st.pending || []).forEach(function (n) { pend[n] = true; });
+      requiredNames().forEach(function (n) { if (!pend[n]) savedNames[n] = true; });
       render();
     })
     .catch(function () { app.textContent = 'coffer 命令已结束或已超时，请回到聊天'; });
