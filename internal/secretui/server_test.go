@@ -531,3 +531,40 @@ func TestOpenBrowserFailureKeepsWaiting(t *testing.T) {
 		t.Fatalf("status %s", out.Status)
 	}
 }
+
+func TestDoneWinsOverConcurrentTimeout(t *testing.T) {
+	slow := func(name string, value []byte) (string, error) {
+		time.Sleep(400 * time.Millisecond)
+		return "", nil
+	}
+	req := baseReq(newFakeSave(), "A")
+	req.Save = slow
+	req.Timeout = 100 * time.Millisecond
+	e := startRun(t, req)
+	resp, body := e.save(t, "A", "v")
+	if resp.StatusCode != 200 || !strings.Contains(body, `"done":true`) {
+		t.Fatalf("%d %s", resp.StatusCode, body)
+	}
+	if out := e.wait(t); out.Status != StatusSaved {
+		t.Fatalf("status %s, want saved", out.Status)
+	}
+}
+
+func TestSaveErrorContainingValueIsRedacted(t *testing.T) {
+	req := baseReq(newFakeSave(), "A")
+	req.Save = func(name string, value []byte) (string, error) {
+		return "", errors.New("backend rejected " + string(value))
+	}
+	req.Timeout = 300 * time.Millisecond
+	e := startRun(t, req)
+	_, body := e.save(t, "A", "leaky-value-123")
+	if strings.Contains(body, "leaky-value-123") {
+		t.Fatalf("response leaks value: %s", body)
+	}
+	out := e.wait(t)
+	for _, r := range out.Results {
+		if strings.Contains(r.Error, "leaky-value-123") || r.Error == "" {
+			t.Fatalf("result %+v", r)
+		}
+	}
+}

@@ -89,6 +89,7 @@ type server struct {
 	results map[string]Result
 	allowed map[string]bool
 	finish  chan Status
+	saved   bool // set under mu once a save completed everything
 }
 
 // Run starts the server and blocks until all required secrets are saved, the
@@ -156,6 +157,16 @@ func Run(ctx context.Context, req Request) (Outcome, error) {
 		status = StatusTimeout
 	case <-ctx.Done():
 		status = StatusCancelled
+	}
+
+	// handleSave may have completed everything just as the timer/ctx fired;
+	// taking mu waits for any in-flight save, then the saved flag wins.
+	if status != StatusSaved {
+		s.mu.Lock()
+		if s.saved {
+			status = StatusSaved
+		}
+		s.mu.Unlock()
 	}
 
 	sctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
@@ -362,13 +373,16 @@ func (s *server) handleSave(w http.ResponseWriter, r *http.Request) {
 		warning, err := s.req.Save(it.name, it.value)
 		res := Result{Name: it.name, Saved: err == nil, Warning: warning}
 		if err != nil {
-			res.Error = err.Error()
+			res.Error = strings.ReplaceAll(err.Error(), string(it.value), "***")
 			allOK = false
 		}
 		s.results[it.name] = res
 		results = append(results, res)
 	}
 	done := allOK && len(s.pendingLocked()) == 0
+	if done {
+		s.saved = true
+	}
 	writeJSON(w, http.StatusOK, map[string]any{"results": results, "done": done})
 	if done {
 		s.signal(StatusSaved)
