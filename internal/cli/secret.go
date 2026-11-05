@@ -114,14 +114,13 @@ func runSecretAdd(args []string, stdout io.Writer, stderr io.Writer, opts *Optio
 		return 1
 	}
 
-	if err := store.Set(ns, name, []byte(value)); err != nil {
+	warning, err := saveSecretValue(store, cfg, cfgPath, ns, name, []byte(value))
+	if err != nil {
 		fmt.Fprintf(stderr, "Error saving secret: %v\n", err)
 		return 1
 	}
-
-	cfg.SetSecretForNamespace(ns, name, "")
-	if err := config.Save(cfg, cfgPath); err != nil {
-		fmt.Fprintf(stderr, "Warning: secret saved to keychain but failed to update config: %v\n", err)
+	if warning != "" {
+		fmt.Fprintf(stderr, "Warning: %s\n", warning)
 	}
 
 	scope := "local"
@@ -130,6 +129,23 @@ func runSecretAdd(args []string, stdout io.Writer, stderr io.Writer, opts *Optio
 	}
 	fmt.Fprintf(stdout, "✓ Secret '%s' saved to %s namespace '%s'\n", name, scope, ns)
 	return 0
+}
+
+// saveSecretValue writes the value to the store; if name is not yet in the
+// namespace's config, it adds an empty entry and saves the config. A config
+// save failure is returned as a warning, not an error.
+func saveSecretValue(store secret.Store, cfg *config.Config, cfgPath, ns, name string, value []byte) (warning string, err error) {
+	if err := store.Set(ns, name, value); err != nil {
+		return "", err
+	}
+	if _, ok := cfg.GetSecretsForNamespace(ns)[name]; ok {
+		return "", nil
+	}
+	cfg.SetSecretForNamespace(ns, name, "")
+	if err := config.Save(cfg, cfgPath); err != nil {
+		return fmt.Sprintf("secret saved but failed to update config: %v", err), nil
+	}
+	return "", nil
 }
 
 func runSecretUpdate(args []string, stdout io.Writer, stderr io.Writer, opts *Options) int {
